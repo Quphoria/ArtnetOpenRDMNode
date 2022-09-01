@@ -16,7 +16,7 @@
 
 #define UID_WIDTH 6
 
-#define UID_COUNT 198
+#define UID_COUNT 5
 int verbose = 0 ;
 
 

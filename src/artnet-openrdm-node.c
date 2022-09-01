@@ -13,11 +13,13 @@
 
 #include "rdm.h"
 #include "dmx.h"
+#include "openrdm.h"
 
 #define UID_WIDTH 6
 
 #define UID_COUNT 5
 int verbose = 0 ;
+int rdm_enabled = 0;
 
 
 uint8_t *generate_rdm_tod(int count, int iteration) {
@@ -88,7 +90,7 @@ int main(int argc, char *argv[]) {
 	int tod_refreshes = 0 ;
 	
 	// parse options 
-	while ((optc = getopt (argc, argv, "va:")) != EOF) {
+	while ((optc = getopt (argc, argv, "vra:")) != EOF) {
 		switch  (optc) {
  			case 'a':
 				ip_addr = (char *) strdup(optarg) ;
@@ -96,10 +98,17 @@ int main(int argc, char *argv[]) {
 			case 'v':
 				verbose = 1 ;
 				break; 
+			case 'r': // Enable RDM
+				rdm_enabled = 1;
+				printf("RDM Enabled\n");
+				break;
       		default:
 				break;
     	}
 	}
+
+	findOpenRDMDevices(verbose);
+	return 0;
 
     node = artnet_new(ip_addr, verbose) ; ;
 
@@ -115,20 +124,23 @@ int main(int argc, char *argv[]) {
 	artnet_set_port_addr(node, 0, ARTNET_OUTPUT_PORT, 0x00) ;
 
 	// set poll reply handler
-//	artnet_set_handler(node, ARTNET_REPLY_HANDLER, reply_handler, NULL) 
-	artnet_set_rdm_initiate_handler(node, rdm_initiate , &tod_refreshes ) ;
-	artnet_set_rdm_handler(node, rdm_handler, NULL ) ;
-		
-	
-	tod = generate_rdm_tod(UID_COUNT, tod_refreshes++) ;
-	artnet_add_rdm_devices(node, 0, tod, UID_COUNT) ;
-	
-	
-	artnet_start(node) ;
+//	artnet_set_handler(node, ARTNET_REPLY_HANDLER, reply_handler, NULL)
+	if (rdm_enabled) {
+		artnet_set_rdm_initiate_handler(node, rdm_initiate , &tod_refreshes ) ;
+		artnet_set_rdm_handler(node, rdm_handler, NULL ) ;
 
-	artnet_send_tod_control(node, 0x10, ARTNET_TOD_FLUSH) ;
-	artnet_send_rdm(node, 0x00 , tod, UID_COUNT* UID_WIDTH) ;
-	free(tod) ;
+		tod = generate_rdm_tod(UID_COUNT, tod_refreshes++) ;
+		artnet_add_rdm_devices(node, 0, tod, UID_COUNT) ;
+	
+		artnet_start(node) ;
+
+		artnet_send_tod_control(node, 0x10, ARTNET_TOD_FLUSH) ;
+		artnet_send_rdm(node, 0x00 , tod, UID_COUNT* UID_WIDTH) ;
+		free(tod) ;
+	} else {
+		artnet_start(node) ;
+	}
+	
 	// loop until control C
 	while(1) {
 		artnet_read(node, 1) ;

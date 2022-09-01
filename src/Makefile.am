@@ -4,4 +4,4 @@ LDADD = $(libartnet_LIBS)
 
 bin_PROGRAMS = artnet_openrdm_node $(NCURSES_PROGS)
 
-artnet_openrdm_node_SOURCES = artnet-openrdm-node.c
+artnet_openrdm_node_SOURCES = artnet-openrdm-node.c openrdm.c

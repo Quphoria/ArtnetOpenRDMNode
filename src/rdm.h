@@ -21,4 +21,21 @@
 #define RDM_PID_QUEUED_MESSAGE      0x0020
 #define RDM_DISC_UNIQUE_BRANCH_SLOTS 25
 
+#pragma pack(push)                       //push current alignment to stack
+#pragma pack(1)                          //set alignment to 1 byte boundary
+struct RDM_Packet_Header	{
+    unsigned char SSC;
+    unsigned char length;
+    unsigned char dest[6];
+    unsigned char src[6];
+    unsigned char transaction_number;
+    unsigned char port_id_resp_type;    //Port ID / response type
+    unsigned char message_count;
+    short unsigned int SubDevice;       //sub device number (root = 0)
+    unsigned char cc;
+    short unsigned int pid;
+    unsigned char pdl;
+};
+#pragma pack(pop)                        //restore original alignment from stack
+
 #endif // __RDM_H__

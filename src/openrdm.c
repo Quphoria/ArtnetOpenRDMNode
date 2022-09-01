@@ -13,6 +13,7 @@ int findOpenRDMDevices(int verbose) {
     ftdi_deinit(&ftdi);
     if(ret < 0) {
         fprintf(stderr, "FTDI ERROR %d: %s\n", ret, ftdi.error_str);
+        ftdi_list_free(&devlist);
         return 0;
     };
 

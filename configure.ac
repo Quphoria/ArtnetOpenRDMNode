@@ -20,6 +20,9 @@ AC_PROG_LIBTOOL
 # FIXME: Replace `main' with a function in `-lncurses':
 AC_CHECK_LIB([ncurses], [initscr], [have_ncurses="yes"])
 AM_CONDITIONAL(HAVE_NCURSES, test "${have_ncurses}" = "yes")
+# Check for libftdi
+AC_CHECK_LIB([ftdi],[ftdi_init],[],[echo "error: missing libftdi library, install with: apt-get install libftdi-dev" && exit 1],[])
+LDFLAGS="-lftdi $LDFLAGS"
 
 # Checks for header files.
 AC_HEADER_STDC

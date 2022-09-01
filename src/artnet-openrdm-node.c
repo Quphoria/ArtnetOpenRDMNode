@@ -32,7 +32,7 @@ uint8_t *generate_rdm_tod(int count, int iteration) {
 	memset(ptr, 0x00, UID_WIDTH * count ) ;
 	for(i = 0 ; i < count; i++) {
 		ptr[i * UID_WIDTH +5] = i ;
-		ptr[i * UID_WIDTH +4] = iteration ;
+		ptr[i * UID_WIDTH +4] = 0;//iteration ;
 	}
 
 	return ptr;
@@ -45,7 +45,9 @@ int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
 
     if (length >= 25) {
         if (rdm[0] == RDM_SUB_START_CODE) {
-            printf("rdm cc: 0x%x, pid: 0x%x, pdl: 0x%x\n", rdm[19], (rdm[20] << 8) | rdm[21], rdm[22]);
+            printf("rdm %02x%02x%02x%02x%02x%02x cc: 0x%02x, pid: 0x%02x%02x, pdl: 0x%02x\n",
+                rdm[2], rdm[3], rdm[4], rdm[5], rdm[6], rdm[7],
+                rdm[19], rdm[20], rdm[21], rdm[22]);
         }
     }
 

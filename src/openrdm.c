@@ -1,6 +1,8 @@
 
 #include <stdio.h>
+#include <string.h>
 
+#include "dmx.h"
 #include "openrdm.h"
 
 int findOpenRDMDevices(int verbose) {
@@ -104,12 +106,30 @@ void writeRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int s
     ftdi_usb_purge_tx_buffer(ftdi);
     FT_SetBreakOn(ftdi);
     FT_SetBreakOff(ftdi);
-    int ret = ftdi_write_data(ftdi, data, size);
-    if (ret != 0) {
+    unsigned char data_sc[513];
+    data_sc[0] = RDM_START_CODE;
+    memcpy(&data_sc[1], data, size);
+    int ret = ftdi_write_data(ftdi, data_sc, size+1);
+    if (ret < 0) {
         fprintf(stderr, "RDM TX ERROR %d: %s\n", ret, ftdi->error_str);
         return;
     }
     unsigned char i;
     ftdi_read_data(ftdi, &i, 1);
     *rx_length = ftdi_read_data(ftdi, rx_data, 512);
+}
+
+void writeDMX(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size) {
+    ftdi_usb_purge_rx_buffer(ftdi);
+    ftdi_usb_purge_tx_buffer(ftdi);
+    FT_SetBreakOn(ftdi);
+    FT_SetBreakOff(ftdi);
+    unsigned char data_sc[513];
+    data_sc[0] = DMX_START_CODE;
+    memcpy(&data_sc[1], data, size);
+    int ret = ftdi_write_data(ftdi, data_sc, size+1);
+    if (ret < 0) {
+        fprintf(stderr, "DMX TX ERROR %d: %s\n", ret, ftdi->error_str);
+        return;
+    }
 }

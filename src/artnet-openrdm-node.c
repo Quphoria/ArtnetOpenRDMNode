@@ -82,6 +82,43 @@ int rdm_initiate(artnet_node n, int port, void *d) {
     return 0;
 }
 
+/*
+ * Called when we have dmx data pending
+ */
+int dmx_handler(artnet_node n, int port, void *d) {
+  uint8_t *data ;
+  int len ;
+
+  if(port == 0) {
+    data = artnet_read_dmx(n, port, &len) ;
+    writeDMX(verbose, &openrdm1, data, len);
+    // pthread_mutex_lock(&mem_mutex) ;
+    // memcpy(&ops->dmx[port][1], data, len) ;
+    // pthread_mutex_unlock(&mem_mutex) ;
+  }
+  return 0;
+}
+
+/*
+ * called when to node configuration changes,
+ * we need to save the configuration to a file
+ */
+int program_handler(artnet_node n, void *d) {
+  artnet_node_config_t config ;
+
+  artnet_get_config(n, &config) ;
+  
+  printf("Program: %s, %s, Subnet: %d, PortAddr: %d\n",
+    config.short_name, config.long_name, config.subnet, config.out_ports[0]);
+
+//   ops->short_name = strdup(config.short_name) ;
+//   ops->long_name = strdup(config.long_name) ;
+//   ops->subnet_addr = config.subnet ;
+//   ops->port_addr = config.out_ports[0] ;
+
+  return 0 ;
+}
+
 void openrdm_deinit_all() {
     deinitOpenRDM(verbose, &openrdm1);
     deinitOpenRDM(verbose, &openrdm2);
@@ -150,10 +187,6 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    openrdm_deinit_all();
-
-    return 0;
-
     node = artnet_new(ip_addr, verbose) ; ;
 
     artnet_set_short_name(node, "artnet-rdm") ;
@@ -163,6 +196,10 @@ int main(int argc, char *argv[]) {
     // set the first port to output dmx data
     artnet_set_port_type(node, 0, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX) ;
     artnet_set_subnet_addr(node, 0x00) ;
+
+    // we want to be notified when the node config changes
+    artnet_set_program_handler(node, program_handler, NULL) ;
+    artnet_set_dmx_handler(node, dmx_handler, NULL) ;
 
     // set the universe address of the first port
     artnet_set_port_addr(node, 0, ARTNET_OUTPUT_PORT, 0x00) ;

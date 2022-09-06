@@ -52,6 +52,7 @@ class RDMPacket {
         RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t message_count, uint16_t sub_device,
             uint8_t cc, uint16_t pid, uint8_t pdl, uint8_t *pdata);
         RDMPacket(UID uid, uint8_t *data, size_t length);
+        size_t writePacket(uint8_t *data);
         bool isValid();
     private:
         bool valid = false;

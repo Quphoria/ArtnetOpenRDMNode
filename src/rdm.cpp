@@ -37,7 +37,7 @@ RDMPacket::RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t mes
     this->pid = pid;
     this->pdl = pdl;
     if (pdl > 0)
-        std::memcpy(this->pdata, pdata, std::min(231, (int)pdl));
+        std::memcpy(this->pdata, pdata, std::min(231U, (unsigned int)pdl));
     this->valid = true;
 }
 
@@ -62,8 +62,34 @@ RDMPacket::RDMPacket(UID uid, uint8_t *data, size_t length) { // The first byte 
     this->pid = ((uint16_t)data[20] << 8) | data[21];
     this->pdl = data[22];
     if (this->pdl > 0)
-        std::memcpy(this->pdata, &data[23], std::min(231, (int)this->pdl));
+        std::memcpy(this->pdata, &data[23], std::min(231U, (unsigned int)this->pdl));
     this->valid = true;
+}
+
+size_t RDMPacket::writePacket(uint8_t *data) {
+    unsigned int length = 25 + std::min(231U, (unsigned int)pdl);
+    data[0] = RDM_SUB_START_CODE;
+    data[1] = length - 2;
+    writeUID(&data[2], dest);
+    writeUID(&data[8], src);
+    data[14] = transaction_number;
+    data[15] = port_id_resp_type;
+    data[16] = message_count;
+    data[17] = sub_device >> 8;
+    data[18] = sub_device & 0xff;
+    data[19] = cc;
+    data[20] = pid >> 8;
+    data[21] = pid & 0xff;
+    data[22] = pdl;
+    if (pdl > 0)
+        std::memcpy(&data[23], pdata, std::min(231U, (unsigned int)pdl));
+    uint16_t checksum = RDM_START_CODE;
+    for (size_t i = 0; i < length-2; i++) {
+        checksum += data[i];
+    }
+    data[length-2] = checksum >> 8;
+    data[length-1] = checksum & 0xff;
+    return length;
 }
 
 bool RDMPacket::isValid() { return valid; }

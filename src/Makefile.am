@@ -1,7 +1,8 @@
 
 AM_CFLAGS = -Wall -Werror
+AM_CXXFLAGS = -Wall -Werror -std=c++17
 LDADD = $(libartnet_LIBS)
 
 bin_PROGRAMS = artnet_openrdm_node $(NCURSES_PROGS)
 
-artnet_openrdm_node_SOURCES = artnet-openrdm-node.c openrdm.c
+artnet_openrdm_node_SOURCES = artnet_openrdm_node.cpp openrdm_device.cpp openrdm.c

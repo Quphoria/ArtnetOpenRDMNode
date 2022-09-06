@@ -10,20 +10,25 @@
 
 #include <stdint.h>
 #include <artnet/artnet.h>
+#include <argparse/argparse.hpp>
 
 #include "rdm.h"
 #include "dmx.h"
-#include "openrdm.h"
+#include "openrdm_device.hpp"
 
 #define UID_WIDTH 6
 
 #define UID_COUNT 5
-int verbose = 0 ;
-int rdm_enabled = 0;
-struct ftdi_context openrdm1, openrdm2, openrdm3, openrdm4;
+bool verbose = 0 ;
+bool rdm_enabled = 0;
+OpenRDMDevice ordm_dev[4] = {
+    OpenRDMDevice("",0),
+    OpenRDMDevice("",0),
+    OpenRDMDevice("",0),
+    OpenRDMDevice("",0)};
 
 uint8_t *generate_rdm_tod(int count, int iteration) {
-    uint8_t *ptr = malloc(count * UID_WIDTH) ;
+    uint8_t *ptr = (uint8_t *)malloc(count * UID_WIDTH) ;
     int i ;
     
     if(ptr == NULL) {
@@ -91,7 +96,7 @@ int dmx_handler(artnet_node n, int port, void *d) {
 
   if(port == 0) {
     data = artnet_read_dmx(n, port, &len) ;
-    writeDMX(verbose, &openrdm1, data, len);
+    ordm_dev[0].writeDMX(data, len);
     // pthread_mutex_lock(&mem_mutex) ;
     // memcpy(&ops->dmx[port][1], data, len) ;
     // pthread_mutex_unlock(&mem_mutex) ;
@@ -120,78 +125,81 @@ int program_handler(artnet_node n, void *d) {
 }
 
 void openrdm_deinit_all() {
-    deinitOpenRDM(verbose, &openrdm1);
-    deinitOpenRDM(verbose, &openrdm2);
-    deinitOpenRDM(verbose, &openrdm3);
-    deinitOpenRDM(verbose, &openrdm4);
+    for (int i = 0; i < 4; i++){
+        ordm_dev[i].deinit();
+    }
 }
 
 int main(int argc, char *argv[]) {
-    artnet_node node ;
-    char *ip_addr = NULL ;
-    int optc ;
-    uint8_t *tod ;
-    int tod_refreshes = 0 ;
-    char *desc1 = NULL;
-    char *desc2 = NULL;
-    char *desc3 = NULL;
-    char *desc4 = NULL;
+    uint8_t *tod;
+    int tod_refreshes = 0;
 
+    argparse::ArgumentParser program("Artnet OpenRDM Node", "1.0.0");
+    program.add_argument("-v", "--verbose")
+        .help("Show debugging information")
+        .default_value(false)
+        .implicit_value(true);
+    program.add_argument("-r", "--rdm")
+        .help("Enable RDM")
+        .default_value(false)
+        .implicit_value(true);
+    program.add_argument("-a", "--address")
+        .default_value(std::string(""))
+        .help("Set the address to listen on");
+    program.add_argument("-d", "--devices")
+        .help("List of up to 4 OpenRDM FTDI device strings to connect to (empty string to skip node ports), omit this argument to list all OpenRDM devices")
+        .nargs(1,4);
     
-    // parse options 
-    while ((optc = getopt (argc, argv, "vra:d:")) != EOF) {
-        switch  (optc) {
-             case 'a':
-                ip_addr = (char *) strdup(optarg) ;
-                break;
-            case 'v':
-                verbose = 1 ;
-                break; 
-            case 'r': // Enable RDM
-                rdm_enabled = 1;
-                printf("RDM Enabled\n");
-                break;
-            case 'd':
-                if (desc1 == NULL) desc1 = (char *) strdup(optarg);
-                else if (desc2 == NULL) desc2 = (char *) strdup(optarg);
-                else if (desc3 == NULL) desc3 = (char *) strdup(optarg);
-                else if (desc4 == NULL) desc4 = (char *) strdup(optarg);
-                break;
-              default:
-                break;
+    try {
+        program.parse_args(argc, argv);                  // Example: ./main -abc 1.95 2.47
+    } catch (const std::runtime_error& err) {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        std::exit(1);
+    }
+
+    verbose = program.get<bool>("--verbose");
+    rdm_enabled = program.get<bool>("--rdm");
+
+    auto dev_strings = program.get<std::vector<std::string>>("--devices");
+    for (size_t i = 0; i < 4 && i < dev_strings.size(); i++) {
+        // Skip 0 length device strings
+        if (dev_strings.at(i).size() == 0) continue;
+        for (size_t j = 1; j < 4 && j < dev_strings.size(); j++) {
+            if (dev_strings.at(i) != dev_strings.at(j)) continue;
+            std::cerr << "Device string argument repeated, please ensure all values for -d/--devices are unique" << std::endl;
+            std::exit(1);
         }
     }
 
-    if ((desc1 && desc2 && strcmp(desc1, desc2)==0) ||
-        (desc1 && desc3 && strcmp(desc1, desc3)==0) ||
-        (desc1 && desc4 && strcmp(desc1, desc4)==0) ||
-        (desc2 && desc3 && strcmp(desc2, desc3)==0) ||
-        (desc2 && desc4 && strcmp(desc2, desc4)==0) ||
-        (desc3 && desc4 && strcmp(desc3, desc4)==0)) {
-            printf("Device string argument repeated, please ensure all values after -d are unique\n");
-        return 0;
+    bool device_connected = false;
+
+    // Initialize openrdm devices
+    for (size_t i = 0; i < 4 && i < dev_strings.size(); i++) {
+        // Skip 0 length device strings
+        if (dev_strings.at(i).size() == 0) continue;
+        ordm_dev[i] = OpenRDMDevice(dev_strings.at(i), verbose);
+        device_connected |= ordm_dev[i].init();
     }
-
-    int device_connected = 0;
-
-    if (desc1) device_connected |= initOpenRDM(verbose, &openrdm1, desc1);
-    if (desc2) device_connected |= initOpenRDM(verbose, &openrdm2, desc2);
-    if (desc3) device_connected |= initOpenRDM(verbose, &openrdm3, desc3);
-    if (desc4) device_connected |= initOpenRDM(verbose, &openrdm4, desc4);
 
     if (!device_connected) {
         printf("No OpenRDM Devices found, please specify FTDI device strings for each device using -d\n");
         // Example device string: s:0x0403:0x6001:00418TL8
-        findOpenRDMDevices(verbose);
-        openrdm_deinit_all();
+        OpenRDMDevice::findDevices(1);
         return 0;
     }
 
-    node = artnet_new(ip_addr, verbose) ; ;
+    
+    char *ip_addr = NULL;
+    auto ip_addr_string = program.get<std::string>("--address");
+    if (ip_addr_string.size() > 0)
+       ip_addr = (char*)ip_addr_string.c_str();
 
-    artnet_set_short_name(node, "artnet-rdm") ;
-    artnet_set_long_name(node, "ArtNet RDM Test, Output Node") ;
-    artnet_set_node_type(node, ARTNET_NODE) ;
+    artnet_node node = artnet_new(ip_addr, verbose);
+
+    artnet_set_short_name(node, "OpenRDM-Node");
+    artnet_set_long_name(node, "ArtNet OpenRDM Node");
+    artnet_set_node_type(node, ARTNET_NODE);
 
     // set the first port to output dmx data
     artnet_set_port_type(node, 0, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX) ;

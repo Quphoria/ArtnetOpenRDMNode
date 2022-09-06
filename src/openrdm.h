@@ -2,6 +2,10 @@
 #ifndef __OPENRDM_H__
 #define __OPENRDM_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ftdi.h>
 
 #define OPENRDM_VID 0x0403
@@ -14,7 +18,11 @@
 int findOpenRDMDevices(int verbose);
 int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char* description);
 void deinitOpenRDM(int verbose, struct ftdi_context *ftdi);
-void writeRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, int is_discover, unsigned char *rx_data, int *rx_length);
-void writeDMX(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size);
+void writeRDMOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, int is_discover, unsigned char *rx_data, int *rx_length);
+void writeDMXOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __OPENRDM_H__

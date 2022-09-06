@@ -9,7 +9,7 @@
 #include <artnet/artnet.h>
 #include <argparse/argparse.hpp>
 
-#include "rdm.h"
+#include "rdm.hpp"
 #include "dmx.h"
 #include "openrdm_device.hpp"
 

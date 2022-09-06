@@ -13,6 +13,7 @@ OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose) {
 
 bool OpenRDMDevice::init() {
     if (initOpenRDM(verbose, &ftdi, ftdi_description.c_str())) {
+        uid = generateUID(ftdi_description);
         initialized = true;
         return true;
     }

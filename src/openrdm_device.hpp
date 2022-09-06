@@ -5,6 +5,7 @@
 #include <string>
 
 #include "openrdm.h"
+#include "rdm.hpp"
 
 class OpenRDMDevice {
     public:
@@ -19,6 +20,8 @@ class OpenRDMDevice {
         bool initialized = false;
         struct ftdi_context ftdi;
         std::string ftdi_description;
+        UID uid;
+        uint8_t rdm_transaction_number = 0;
 };
 
 #endif // __OPENRDM_DEVICE_HPP__

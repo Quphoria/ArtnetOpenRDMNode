@@ -21,6 +21,7 @@ bool OpenRDMDevice::init() {
 }
 
 void OpenRDMDevice::deinit() {
+    if (!initialized) return;
     deinitOpenRDM(verbose, &ftdi);
     initialized = false;
 }

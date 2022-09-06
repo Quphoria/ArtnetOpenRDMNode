@@ -2,13 +2,10 @@
 #include <config.h>
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <time.h>
+#include <iostream>
+#include <string>
+#include <cstring>
 
-#include <stdint.h>
 #include <artnet/artnet.h>
 #include <argparse/argparse.hpp>
 
@@ -21,11 +18,7 @@
 #define UID_COUNT 5
 bool verbose = 0 ;
 bool rdm_enabled = 0;
-OpenRDMDevice ordm_dev[4] = {
-    OpenRDMDevice("",0),
-    OpenRDMDevice("",0),
-    OpenRDMDevice("",0),
-    OpenRDMDevice("",0)};
+OpenRDMDevice ordm_dev[4] = {OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice()};
 
 uint8_t *generate_rdm_tod(int count, int iteration) {
     uint8_t *ptr = (uint8_t *)malloc(count * UID_WIDTH) ;
@@ -48,7 +41,8 @@ uint8_t *generate_rdm_tod(int count, int iteration) {
 
 int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
 
-    printf("got rdm data for address %d, of length %d\n", address, length) ;
+    if (verbose)
+        printf("got rdm data for address %d, of length %d\n", address, length);
 
     if (length >= 25) {
         if (rdm[0] == RDM_SUB_START_CODE) {
@@ -91,17 +85,17 @@ int rdm_initiate(artnet_node n, int port, void *d) {
  * Called when we have dmx data pending
  */
 int dmx_handler(artnet_node n, int port, void *d) {
-  uint8_t *data ;
-  int len ;
+    uint8_t *data ;
+    int len ;
 
-  if(port == 0) {
-    data = artnet_read_dmx(n, port, &len) ;
-    ordm_dev[0].writeDMX(data, len);
+    if(port == 0) {
+        data = artnet_read_dmx(n, port, &len) ;
+        ordm_dev[0].writeDMX(data, len);
     // pthread_mutex_lock(&mem_mutex) ;
     // memcpy(&ops->dmx[port][1], data, len) ;
     // pthread_mutex_unlock(&mem_mutex) ;
-  }
-  return 0;
+    }
+    return 0;
 }
 
 /*
@@ -109,19 +103,20 @@ int dmx_handler(artnet_node n, int port, void *d) {
  * we need to save the configuration to a file
  */
 int program_handler(artnet_node n, void *d) {
-  artnet_node_config_t config ;
+    artnet_node_config_t config ;
 
-  artnet_get_config(n, &config) ;
+    artnet_get_config(n, &config) ;
   
-  printf("Program: %s, %s, Subnet: %d, PortAddr: %d\n",
-    config.short_name, config.long_name, config.subnet, config.out_ports[0]);
+    if (verbose)
+        printf("Program: %s, %s, Subnet: %d, PortAddr: %d\n",
+            config.short_name, config.long_name, config.subnet, config.out_ports[0]);
 
 //   ops->short_name = strdup(config.short_name) ;
 //   ops->long_name = strdup(config.long_name) ;
 //   ops->subnet_addr = config.subnet ;
 //   ops->port_addr = config.out_ports[0] ;
 
-  return 0 ;
+    return 0 ;
 }
 
 void openrdm_deinit_all() {
@@ -183,17 +178,21 @@ int main(int argc, char *argv[]) {
     }
 
     if (!device_connected) {
-        printf("No OpenRDM Devices found, please specify FTDI device strings for each device using -d\n");
+        std::cerr << "No OpenRDM Devices found, please specify FTDI device strings for each device using -d" << std::endl;
         // Example device string: s:0x0403:0x6001:00418TL8
         OpenRDMDevice::findDevices(1);
         return 0;
+    }
+
+    if (rdm_enabled && verbose) {
+        std::cout << "RDM Enabled" << std::endl;
     }
 
     
     char *ip_addr = NULL;
     auto ip_addr_string = program.get<std::string>("--address");
     if (ip_addr_string.size() > 0)
-       ip_addr = (char*)ip_addr_string.c_str();
+        ip_addr = (char*)ip_addr_string.c_str();
 
     artnet_node node = artnet_new(ip_addr, verbose);
 

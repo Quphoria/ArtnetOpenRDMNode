@@ -101,7 +101,7 @@ void deinitOpenRDM(int verbose, struct ftdi_context *ftdi) {
     ftdi_deinit(ftdi);
 }
 
-void writeRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, unsigned char *rx_data, int *rx_length) {
+void writeRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, int is_discover, unsigned char *rx_data, int *rx_length) {
     ftdi_usb_purge_rx_buffer(ftdi);
     ftdi_usb_purge_tx_buffer(ftdi);
     FT_SetBreakOn(ftdi);
@@ -114,8 +114,12 @@ void writeRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int s
         fprintf(stderr, "RDM TX ERROR %d: %s\n", ret, ftdi->error_str);
         return;
     }
+    if (is_discover) {
+        *rx_length = ftdi_read_data(ftdi, rx_data, 24);
+        return;
+    }
     unsigned char i;
-    ftdi_read_data(ftdi, &i, 1);
+    ftdi_read_data(ftdi, &i, 1); // Discard Break
     *rx_length = ftdi_read_data(ftdi, rx_data, 512);
 }
 

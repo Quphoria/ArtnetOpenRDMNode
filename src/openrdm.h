@@ -14,7 +14,7 @@
 int findOpenRDMDevices(int verbose);
 int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char* description);
 void deinitOpenRDM(int verbose, struct ftdi_context *ftdi);
-void writeRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, unsigned char *rx_data, int *rx_length);
+void writeRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, int is_discover, unsigned char *rx_data, int *rx_length);
 void writeDMX(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size);
 
 #endif // __OPENRDM_H__

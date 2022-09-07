@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <array>
 
 // RDM Constants
 #define RDM_SUB_START_CODE 0x01
@@ -22,37 +23,26 @@
 #define RDM_PID_DISC_MUTE           0x0002
 #define RDM_PID_DISC_UNMUTE         0x0003
 #define RDM_PID_QUEUED_MESSAGE      0x0020
-#define RDM_DISC_UNIQUE_BRANCH_SLOTS 25
+#define RDM_PID_PROXIED_DEVICES     0x0000
 
 typedef uint64_t UID;
 
 #define RDM_UID_BROADCAST 0xFFFFFFFFFFFF
+#define RDM_UID_MAX 0xFFFFFFFFFFFE
 #define RDM_UID_LENGTH 6
 #define RDM_UID_MFR 0x7A70 // Open Lighting ETSA Code
 
-#pragma pack(push)                       //push current alignment to stack
-#pragma pack(1)                          //set alignment to 1 byte boundary
-struct RDM_Packet_Header	{
-    unsigned char SSC;
-    unsigned char length;
-    unsigned char dest[6];
-    unsigned char src[6];
-    unsigned char transaction_number;
-    unsigned char port_id_resp_type;    //Port ID / response type
-    unsigned char message_count;
-    short unsigned int SubDevice;       //sub device number (root = 0)
-    unsigned char cc;
-    short unsigned int pid;
-    unsigned char pdl;
-};
-#pragma pack(pop)                        //restore original alignment from stack
+#define RDM_MAX_PDL 231U
+
+typedef std::array<uint8_t, 512> RDMData;
+typedef std::array<uint8_t, RDM_MAX_PDL> RDMPacketData;
 
 class RDMPacket {
     public:
         RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t message_count, uint16_t sub_device,
-            uint8_t cc, uint16_t pid, uint8_t pdl, uint8_t *pdata);
-        RDMPacket(UID uid, uint8_t *data, size_t length);
-        size_t writePacket(uint8_t *data);
+            uint8_t cc, uint16_t pid, uint8_t pdl, const RDMPacketData &pdata);
+        RDMPacket(UID uid, const RDMData &data, size_t length);
+        size_t writePacket(RDMData &data);
         bool isValid();
     private:
         bool valid = false;
@@ -65,12 +55,12 @@ class RDMPacket {
         uint8_t cc;
         uint16_t pid;
         uint8_t pdl;
-        uint8_t pdata[231];
+        RDMPacketData pdata;
 };
 
 class DiscoveryResponseRDMPacket {
     public:
-        DiscoveryResponseRDMPacket(uint8_t *data, size_t length);
+        DiscoveryResponseRDMPacket(const RDMData &data, size_t length);
         bool isValid();
         UID getUID();
     private:
@@ -78,7 +68,7 @@ class DiscoveryResponseRDMPacket {
         UID uid;
 };
 
-UID getUID(uint8_t *data);
+UID getUID(const uint8_t *data);
 void writeUID(uint8_t *data, UID uid);
 UID generateUID(std::string s);
 

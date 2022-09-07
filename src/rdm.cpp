@@ -1,11 +1,10 @@
 
 #include <functional>
-#include <cstring>
 
 #include "rdm.hpp"
 #include "dmx.h"
 
-UID getUID(uint8_t *data) {
+UID getUID(const uint8_t *data) {
     UID uid = 0;
     for (int i = 0; i < RDM_UID_LENGTH; i++)
         uid |= (UID)data[i] << (8*(RDM_UID_LENGTH-1-i));
@@ -26,7 +25,7 @@ UID generateUID(std::string s) {
 }
 
 RDMPacket::RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t message_count, uint16_t sub_device,
-        uint8_t cc, uint16_t pid, uint8_t pdl, uint8_t *pdata) {
+        uint8_t cc, uint16_t pid, uint8_t pdl, const RDMPacketData &pdata) {
     this->dest = dest;
     this->src = src;
     this->transaction_number = tn;
@@ -37,12 +36,12 @@ RDMPacket::RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t mes
     this->pid = pid;
     this->pdl = pdl;
     if (pdl > 0)
-        std::memcpy(this->pdata, pdata, std::min(231U, (unsigned int)pdl));
+        std::copy(pdata.begin(), pdata.begin() + std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
     this->valid = true;
 }
 
-RDMPacket::RDMPacket(UID uid, uint8_t *data, size_t length) { // The first byte of data is Sub-Start Code
-    if (length < 25  || length > 25+231) return; // Invalid packet length
+RDMPacket::RDMPacket(UID uid, const RDMData &data, size_t length) { // The first byte of data is Sub-Start Code
+    if (length < 25  || length > 25+RDM_MAX_PDL) return; // Invalid packet length
     if (data[0] != RDM_SUB_START_CODE) return; // Incorrect sub start code
     if (data[1] != length-2) return; // Incorrect length field
     if (getUID(&data[2]) != uid) return; // Message isn't for us
@@ -62,12 +61,12 @@ RDMPacket::RDMPacket(UID uid, uint8_t *data, size_t length) { // The first byte 
     this->pid = ((uint16_t)data[20] << 8) | data[21];
     this->pdl = data[22];
     if (this->pdl > 0)
-        std::memcpy(this->pdata, &data[23], std::min(231U, (unsigned int)this->pdl));
+        std::copy(&data[23], data.begin() + std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
     this->valid = true;
 }
 
-size_t RDMPacket::writePacket(uint8_t *data) {
-    unsigned int length = 25 + std::min(231U, (unsigned int)pdl);
+size_t RDMPacket::writePacket(RDMData &data) {
+    unsigned int length = 25 + std::min(RDM_MAX_PDL, (unsigned int)pdl);
     data[0] = RDM_SUB_START_CODE;
     data[1] = length - 2;
     writeUID(&data[2], dest);
@@ -82,7 +81,7 @@ size_t RDMPacket::writePacket(uint8_t *data) {
     data[21] = pid & 0xff;
     data[22] = pdl;
     if (pdl > 0)
-        std::memcpy(&data[23], pdata, std::min(231U, (unsigned int)pdl));
+        std::copy(pdata.begin(), pdata.begin() + std::min(RDM_MAX_PDL, (unsigned int)pdl), &data[23]);
     uint16_t checksum = RDM_START_CODE;
     for (size_t i = 0; i < length-2; i++) {
         checksum += data[i];
@@ -94,7 +93,7 @@ size_t RDMPacket::writePacket(uint8_t *data) {
 
 bool RDMPacket::isValid() { return valid; }
 
-DiscoveryResponseRDMPacket::DiscoveryResponseRDMPacket(uint8_t *data, size_t length) {
+DiscoveryResponseRDMPacket::DiscoveryResponseRDMPacket(const RDMData &data, size_t length) {
     if (length < 17 || length > 24) return;
     size_t i = 0;
     if (data[i] == RDM_START_CODE) i++;

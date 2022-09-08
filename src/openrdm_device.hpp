@@ -8,6 +8,8 @@
 #include "openrdm.h"
 #include "rdm.hpp"
 
+typedef std::vector<UID> UIDList;
+
 class OpenRDMDevice {
     public:
         bool verbose, rdm_enabled;
@@ -17,11 +19,12 @@ class OpenRDMDevice {
         void deinit();
         static void findDevices(bool verbose);
         void writeDMX(uint8_t *data, int len);
-        std::vector<UID> fullRDMDiscovery(); // Returns full TOD
-        std::pair<std::vector<UID>, std::vector<UID>> incrementalRDMDiscovery(); // Returns pair: added devices, removed devices
+        UIDList fullRDMDiscovery(); // Returns full TOD
+        std::pair<UIDList, UIDList> incrementalRDMDiscovery(); // Returns pair: added devices, removed devices
     protected:
-        std::vector<UID> discover(UID start, UID end);
-        std::vector<UID> getProxyTOD(UID addr);
+        UIDList discover(UID start, UID end);
+        UIDList getProxyTOD(UID addr);
+        bool hasProxyTODChanged(UID addr);
         bool sendMute(UID addr, bool unmute, bool &is_proxy);
     private:
         bool initialized = false;
@@ -30,8 +33,7 @@ class OpenRDMDevice {
         std::string ftdi_description;
         UID uid;
         uint8_t rdm_transaction_number = 0;
-        std::vector<UID> tod;
-        std::vector<UID> lost;
+        UIDList tod, lost, proxies;
 };
 
 #endif // __OPENRDM_DEVICE_HPP__

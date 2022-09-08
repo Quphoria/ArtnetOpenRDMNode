@@ -20,8 +20,9 @@ bool OpenRDMDevice::init() {
         uid = generateUID(ftdi_description);
         discovery_in_progress = false;
         rdm_transaction_number = 0;
-        tod = std::vector<UID>();
-        lost = std::vector<UID>();
+        tod = UIDList();
+        lost = UIDList();
+        proxies = UIDList();
         initialized = true;
         return true;
     }
@@ -44,11 +45,12 @@ void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
     writeDMXOpenRDM(verbose, &ftdi, data, len);
 }
 
-std::vector<UID> OpenRDMDevice::fullRDMDiscovery() {
-    if (discovery_in_progress || !rdm_enabled) return std::vector<UID>();
+UIDList OpenRDMDevice::fullRDMDiscovery() {
+    if (discovery_in_progress || !rdm_enabled) return UIDList();
 
     discovery_in_progress = true;
-    lost = std::vector<UID>();
+    lost = UIDList();
+    proxies = UIDList();
 
     bool NA = false;
     sendMute(RDM_UID_BROADCAST, true, NA); // Unmute everything
@@ -58,24 +60,60 @@ std::vector<UID> OpenRDMDevice::fullRDMDiscovery() {
     return tod;
 }
 
-std::pair<std::vector<UID>, std::vector<UID>> OpenRDMDevice::incrementalRDMDiscovery() {
-    if (discovery_in_progress || !rdm_enabled) return std::make_pair(std::vector<UID>(), std::vector<UID>());
+std::pair<UIDList, UIDList> OpenRDMDevice::incrementalRDMDiscovery() {
+    if (discovery_in_progress || !rdm_enabled) return std::make_pair(UIDList(), UIDList());
     discovery_in_progress = true;
-    auto found = std::vector<UID>();
-    auto new_lost = std::vector<UID>();
-    bool NA = false;
+    auto found = UIDList();
+    auto new_lost = UIDList();
+    auto new_proxies = UIDList();
     // Check tod devices are still there and lost devices are still lost
     for (auto &uid : tod) {
-        if (!sendMute(uid, false, NA)) {
+        bool is_proxy = false;
+        if (!sendMute(uid, false, is_proxy)) {
             new_lost.push_back(uid);
+            auto proxies_pos = std::find(proxies.begin(), proxies.end(), uid);
+            if (proxies_pos != proxies.end()) {
+                proxies.erase(proxies_pos);
+            }
+        } else  {
+            auto proxies_pos = std::find(proxies.begin(), proxies.end(), uid);
+            if (proxies_pos != proxies.end()) {
+                if (!is_proxy) proxies.erase(proxies_pos);
+            } else if (is_proxy) {
+                new_proxies.push_back(uid);
+                proxies.push_back(uid);
+            }
         }
     }
     for (auto &uid : lost) {
-        if (sendMute(uid, false, NA)) {
+        bool is_proxy = false;
+        if (sendMute(uid, false, is_proxy)) {
             found.push_back(uid);
+            if (is_proxy) {
+                auto proxies_pos = std::find(proxies.begin(), proxies.end(), uid);
+                if (proxies_pos == proxies.end()) {
+                    new_proxies.push_back(uid);
+                    proxies.push_back(uid);
+                }
+            }
         }
     }
+
     auto discovered = discover(0, RDM_UID_MAX);
+    
+    for (auto &proxy_uid : proxies) {
+        // If proxy is in new_proxies, don't bother checking if its TOD has changed as we want to scan anyway
+        if (std::find(new_proxies.begin(), new_proxies.end(), proxy_uid) == new_proxies.end()) {
+            if (!hasProxyTODChanged(proxy_uid)) continue;
+        }
+        auto new_proxy_tod = getProxyTOD(proxy_uid);
+        for (auto &uid : new_proxy_tod) {
+            // Merge into discovered if unique and new
+            if (std::find(discovered.begin(), discovered.end(), uid) == discovered.end()) {
+                discovered.push_back(uid);
+            }
+        }
+    }
 
     for (auto &uid : discovered) {
         // If we find a device that has been found as lost, but it isn't, remove it from lost

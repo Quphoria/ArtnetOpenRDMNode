@@ -24,6 +24,7 @@
 #define RDM_PID_DISC_UNMUTE         0x0003
 #define RDM_PID_QUEUED_MESSAGE      0x0020
 #define RDM_PID_PROXIED_DEVICES     0x0010
+#define RDM_PID_PROXY_DEV_COUNT     0x0011
 
 typedef uint64_t UID;
 

@@ -24,6 +24,8 @@ UID generateUID(std::string s) {
     return uid; 
 }
 
+RDMPacket::RDMPacket() {}
+
 RDMPacket::RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t message_count, uint16_t sub_device,
         uint8_t cc, uint16_t pid, uint8_t pdl, const RDMPacketData &pdata) {
     this->dest = dest;
@@ -35,6 +37,7 @@ RDMPacket::RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t mes
     this->cc = cc;
     this->pid = pid;
     this->pdl = pdl;
+    this->pdata = RDMPacketData();
     if (pdl > 0)
         std::copy(pdata.begin(), pdata.begin() + std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
     this->valid = true;

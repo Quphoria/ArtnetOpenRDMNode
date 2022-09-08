@@ -201,11 +201,11 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
 UIDList OpenRDMDevice::getProxyTOD(UID addr) {
     auto proxy_tod_msg = RDMPacket(addr, uid, rdm_transaction_number++, 0x1, 0, 0,
         RDM_CC_GET_COMMAND, RDM_PID_PROXIED_DEVICES, 0, RDMPacketData());
-    auto proxy_tod_msg_packet = RDMData();
-    size_t msg_len = proxy_tod_msg.writePacket(proxy_tod_msg_packet);
 
-    // TODO: Send the packet and handle the response(s)
-    (void)msg_len; // Hide unused warning
+    RDMPacket resp = sendRDMPacket(proxy_tod_msg);
+    if (!resp.isValid()) return UIDList();
+
+    // TODO: Handle the response
 
     return UIDList();
 }
@@ -213,11 +213,11 @@ UIDList OpenRDMDevice::getProxyTOD(UID addr) {
 bool OpenRDMDevice::hasProxyTODChanged(UID addr) {
     auto proxy_tod_changed_msg = RDMPacket(addr, uid, rdm_transaction_number++, 0x1, 0, 0,
         RDM_CC_GET_COMMAND, RDM_PID_PROXY_DEV_COUNT, 0, RDMPacketData());
-    auto proxy_tod_changed_msg_packet = RDMData();
-    size_t msg_len = proxy_tod_changed_msg.writePacket(proxy_tod_changed_msg_packet);
 
-    // TODO: Send the packet and handle the response(s)
-    (void)msg_len; // Hide unused warning
+    RDMPacket resp = sendRDMPacket(proxy_tod_changed_msg);
+    if (!resp.isValid()) return false;
+
+    // TODO: Handle the response
 
     return false;
 }
@@ -226,11 +226,23 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
     auto mute_msg = RDMPacket(addr, uid, rdm_transaction_number++, 0x1, 0, 0,
         RDM_CC_DISCOVER, unmute ? RDM_PID_DISC_UNMUTE : RDM_PID_DISC_MUTE,
         0, RDMPacketData());
-    auto mute_msg_packet = RDMData();
-    size_t msg_len = mute_msg.writePacket(mute_msg_packet);
 
-    // TODO: Send the packet and handle the response(s)
-    (void)msg_len; // Hide unused warning
+    RDMPacket resp = sendRDMPacket(mute_msg);
+    if (!resp.isValid()) return false;
+
+    // TODO: Handle the response
 
     return false;
+}
+
+RDMPacket OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int retries, unsigned int max_time_ms) {
+    auto msg = RDMData();
+    size_t msg_len = pkt.writePacket(msg);
+    
+    // TODO: Send the message and handle responses/retries
+    // See ANSI E1.20: 6.3 Response Type Field Values
+    // As certain command classes only support certain response types
+    (void)msg_len;
+
+    return RDMPacket(); // Return invalid response packet
 }

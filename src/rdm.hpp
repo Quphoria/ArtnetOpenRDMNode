@@ -40,6 +40,7 @@ typedef std::array<uint8_t, RDM_MAX_PDL> RDMPacketData;
 
 class RDMPacket {
     public:
+        RDMPacket();
         RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t message_count, uint16_t sub_device,
             uint8_t cc, uint16_t pid, uint8_t pdl, const RDMPacketData &pdata);
         RDMPacket(UID uid, const RDMData &data, size_t length);

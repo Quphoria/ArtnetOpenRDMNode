@@ -202,8 +202,8 @@ UIDList OpenRDMDevice::getProxyTOD(UID addr) {
     auto proxy_tod_msg = RDMPacket(addr, uid, rdm_transaction_number++, 0x1, 0, 0,
         RDM_CC_GET_COMMAND, RDM_PID_PROXIED_DEVICES, 0, RDMPacketData());
 
-    RDMPacket resp = sendRDMPacket(proxy_tod_msg);
-    if (!resp.isValid()) return UIDList();
+    auto resp = sendRDMPacket(proxy_tod_msg);
+    if (resp.size() == 0) return UIDList();
 
     // TODO: Handle the response
 
@@ -214,8 +214,8 @@ bool OpenRDMDevice::hasProxyTODChanged(UID addr) {
     auto proxy_tod_changed_msg = RDMPacket(addr, uid, rdm_transaction_number++, 0x1, 0, 0,
         RDM_CC_GET_COMMAND, RDM_PID_PROXY_DEV_COUNT, 0, RDMPacketData());
 
-    RDMPacket resp = sendRDMPacket(proxy_tod_changed_msg);
-    if (!resp.isValid()) return false;
+    auto resp = sendRDMPacket(proxy_tod_changed_msg);
+    if (resp.size() == 0) return false;
 
     // TODO: Handle the response
 
@@ -227,22 +227,24 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
         RDM_CC_DISCOVER, unmute ? RDM_PID_DISC_UNMUTE : RDM_PID_DISC_MUTE,
         0, RDMPacketData());
 
-    RDMPacket resp = sendRDMPacket(mute_msg);
-    if (!resp.isValid()) return false;
+    auto resp = sendRDMPacket(mute_msg);
+    if (resp.size() == 0) return false;
 
     // TODO: Handle the response
 
     return false;
 }
 
-RDMPacket OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int retries, unsigned int max_time_ms) {
+std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int retries, unsigned int max_time_ms) {
     auto msg = RDMData();
     size_t msg_len = pkt.writePacket(msg);
+
+    auto resp_packets = std::vector<RDMPacket>();
     
     // TODO: Send the message and handle responses/retries
     // See ANSI E1.20: 6.3 Response Type Field Values
     // As certain command classes only support certain response types
     (void)msg_len;
 
-    return RDMPacket(); // Return invalid response packet
+    return resp_packets; // Return invalid response packet
 }

@@ -25,6 +25,7 @@
 #define RDM_PID_QUEUED_MESSAGE      0x0020
 #define RDM_PID_PROXIED_DEVICES     0x0010
 #define RDM_PID_PROXY_DEV_COUNT     0x0011
+#define RDM_STATUS_ERROR            0x04
 
 typedef uint64_t UID;
 
@@ -46,18 +47,19 @@ class RDMPacket {
         RDMPacket(UID uid, const RDMData &data, size_t length);
         size_t writePacket(RDMData &data);
         bool isValid();
-    private:
-        bool valid = false;
-        UID dest;
-        UID src;
+        uint8_t getRespType();
         uint8_t transaction_number;
-        uint8_t port_id_resp_type;
-        uint8_t message_count;
-        uint16_t sub_device;
         uint8_t cc;
         uint16_t pid;
         uint8_t pdl;
         RDMPacketData pdata;
+    private:
+        bool valid = false;
+        UID dest;
+        UID src;
+        uint8_t port_id_resp_type;
+        uint8_t message_count;
+        uint16_t sub_device;
 };
 
 class DiscoveryResponseRDMPacket {

@@ -1,5 +1,7 @@
 
 #include <algorithm>
+#include <thread>
+#include <chrono>
 
 #include "openrdm_device.hpp"
 
@@ -235,16 +237,61 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
     return false;
 }
 
-std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int retries, unsigned int max_time_ms) {
-    auto msg = RDMData();
-    size_t msg_len = pkt.writePacket(msg);
-
+std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int retries, double max_time_ms) {
     auto resp_packets = std::vector<RDMPacket>();
-    
-    // TODO: Send the message and handle responses/retries
-    // See ANSI E1.20: 6.3 Response Type Field Values
-    // As certain command classes only support certain response types
-    (void)msg_len;
+    double retry_time_ms = max_time_ms;
+    auto msg = RDMData();
+
+    auto t_start = std::chrono::high_resolution_clock::now();
+    auto pkt_pid = pkt.pid;
+
+    // Don't count first try as a retry
+    for (unsigned int pkt_try = 0; pkt_try <= retries; pkt_try++) {
+        if (pkt_try != 0) {
+            pkt.transaction_number = rdm_transaction_number++;
+        }
+        size_t msg_len = pkt.writePacket(msg);
+        auto t_now = std::chrono::high_resolution_clock::now();
+        double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_now-t_start).count();
+        if (pkt_try > 0 && elapsed_time_ms > max_time_ms) break;
+
+        auto response = RDMData();
+        size_t resp_len = writeRDMOpenRDM(verbose, &ftdi,
+            msg.begin(), msg_len, false, response.begin());
+        if (resp_len == 0) continue;
+
+        auto resp = RDMPacket(uid, response, resp_len);
+        if (!resp.isValid()) continue;
+        if (resp.cc != pkt.cc) continue; // Check transaction id's match
+        if (resp.pid != pkt_pid) continue; // Check PID is correct (so we ignore stray queued messages)
+
+        if (resp.cc == RDM_CC_DISCOVER_RESP || pkt.cc == RDM_CC_DISCOVER) {
+            if (resp.getRespType() == RDM_RESP_ACK) {
+                resp_packets.push_back(resp);
+                break;
+            }
+        } else if (resp.cc == RDM_CC_GET_COMMAND_RESP || resp.cc == RDM_CC_SET_COMMAND_RESP) {
+            switch (resp.getRespType()) {
+                case RDM_RESP_ACK:
+                    resp_packets.push_back(resp);
+                    return resp_packets;
+                case RDM_RESP_ACK_OVERFL:
+                    resp_packets.push_back(resp);
+                    break;
+                case RDM_RESP_ACK_TIMER:
+                    if (resp.pdl != 2) continue;
+                    retry_time_ms = 100 * (double)(((uint16_t)resp.pdata[0] << 8) | (uint16_t)resp.pdata[1]);
+                    pkt.cc = RDM_CC_GET_COMMAND;
+                    pkt.pid = RDM_PID_QUEUED_MESSAGE;
+                    pkt.pdl = 1;
+                    pkt.pdata[0] = RDM_STATUS_ERROR;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1)*std::min(max_time_ms, retry_time_ms));
+                    break;
+                case RDM_RESP_NACK:
+                    break;
+            }
+        }
+    }
 
     return resp_packets; // Return invalid response packet
 }

@@ -26,6 +26,7 @@
 #define RDM_PID_PROXIED_DEVICES     0x0010
 #define RDM_PID_PROXY_DEV_COUNT     0x0011
 #define RDM_STATUS_ERROR            0x04
+#define RDM_CONTROL_MANAGED_PROXY_BITMASK   0x1
 
 typedef uint64_t UID;
 
@@ -48,6 +49,7 @@ class RDMPacket {
         size_t writePacket(RDMData &data);
         bool isValid();
         uint8_t getRespType();
+        UID getSrc();
         uint8_t transaction_number;
         uint8_t cc;
         uint16_t pid;

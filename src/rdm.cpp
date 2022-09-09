@@ -96,6 +96,7 @@ size_t RDMPacket::writePacket(RDMData &data) {
 
 bool RDMPacket::isValid() { return valid; }
 uint8_t RDMPacket::getRespType() { return port_id_resp_type; }
+UID RDMPacket::getSrc() { return src; }
 
 DiscoveryResponseRDMPacket::DiscoveryResponseRDMPacket(const RDMData &data, size_t length) {
     if (length < 17 || length > 24) return;

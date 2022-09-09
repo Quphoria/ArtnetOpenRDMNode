@@ -204,12 +204,18 @@ UIDList OpenRDMDevice::getProxyTOD(UID addr) {
     auto proxy_tod_msg = RDMPacket(addr, uid, rdm_transaction_number++, 0x1, 0, 0,
         RDM_CC_GET_COMMAND, RDM_PID_PROXIED_DEVICES, 0, RDMPacketData());
 
+    auto proxy_tod = UIDList();
+    
     auto resp = sendRDMPacket(proxy_tod_msg);
-    if (resp.size() == 0) return UIDList();
+    if (resp.size() == 0) return proxy_tod;
 
-    // TODO: Handle the response
+    for (auto &r : resp) {
+        if (r.pdl > 0xe4) continue;
+        for (size_t i = 0; i < r.pdl; i += RDM_UID_LENGTH)
+            proxy_tod.push_back(getUID(&r.pdata[i]));
+    }
 
-    return UIDList();
+    return proxy_tod;
 }
 
 bool OpenRDMDevice::hasProxyTODChanged(UID addr) {
@@ -218,10 +224,9 @@ bool OpenRDMDevice::hasProxyTODChanged(UID addr) {
 
     auto resp = sendRDMPacket(proxy_tod_changed_msg);
     if (resp.size() == 0) return false;
-
-    // TODO: Handle the response
-
-    return false;
+    if (resp[0].pdl != 0x03) return false;
+    
+    return resp[0].pdata[2] != 0;
 }
 
 bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
@@ -231,10 +236,14 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
 
     auto resp = sendRDMPacket(mute_msg);
     if (resp.size() == 0) return false;
+    if (resp[0].getSrc() != addr) return false;
 
-    // TODO: Handle the response
+    if (resp[0].pdl == 0x02 || resp[0].pdl == 0x08) {
+        uint16_t control_field = ((uint16_t)resp[0].pdata[0] << 8) | (uint16_t)resp[0].pdata[1];
+        is_proxy = (control_field & RDM_CONTROL_MANAGED_PROXY_BITMASK) != 0;
+    }
 
-    return false;
+    return true;
 }
 
 std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int retries, double max_time_ms) {

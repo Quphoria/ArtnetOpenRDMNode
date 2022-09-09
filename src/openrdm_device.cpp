@@ -48,12 +48,14 @@ void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
 }
 
 std::pair<int, RDMData> OpenRDMDevice::writeRDM(uint8_t *data, int len) {
+    if (!initialized) return std::make_pair(0, RDMData());
     auto resp = RDMData();
     size_t resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin());
     return std::make_pair(resp_len, resp);
 }
 
 UIDList OpenRDMDevice::fullRDMDiscovery() {
+    if (!initialized) return UIDList();
     if (discovery_in_progress || !rdm_enabled) return UIDList();
 
     discovery_in_progress = true;
@@ -69,6 +71,7 @@ UIDList OpenRDMDevice::fullRDMDiscovery() {
 }
 
 std::pair<UIDList, UIDList> OpenRDMDevice::incrementalRDMDiscovery() {
+    if (!initialized) return std::make_pair(UIDList(), UIDList());
     if (discovery_in_progress || !rdm_enabled) return std::make_pair(UIDList(), UIDList());
     discovery_in_progress = true;
     auto found = UIDList();

@@ -13,34 +13,11 @@
 #include "dmx.h"
 #include "openrdm_device.hpp"
 
-#define UID_WIDTH 6
-
-#define UID_COUNT 5
 bool verbose = 0 ;
 bool rdm_enabled = 0;
 OpenRDMDevice ordm_dev[4] = {OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice()};
 
-uint8_t *generate_rdm_tod(int count, int iteration) {
-    uint8_t *ptr = (uint8_t *)malloc(count * UID_WIDTH) ;
-    int i ;
-    
-    if(ptr == NULL) {
-        printf("malloc failed\n") ;
-        exit(1) ;
-    }
-
-    memset(ptr, 0x00, UID_WIDTH * count ) ;
-    for(i = 0 ; i < count; i++) {
-        ptr[i * UID_WIDTH +5] = i ;
-        ptr[i * UID_WIDTH +4] = 0;//iteration ;
-    }
-
-    return ptr;
-
-}
-
 int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
-
     if (verbose)
         printf("got rdm data for address %d, of length %d\n", address, length);
 
@@ -56,14 +33,6 @@ int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
             artnet_send_rdm(n, address, resp.second.begin(), resp.first);
         }
     }
-
-    // if (length >= 25) {
-    //     if (rdm[0] == RDM_SUB_START_CODE) {
-    //         printf("rdm %02x%02x%02x%02x%02x%02x cc: 0x%02x, pid: 0x%02x%02x, pdl: 0x%02x\n",
-    //             rdm[2], rdm[3], rdm[4], rdm[5], rdm[6], rdm[7],
-    //             rdm[19], rdm[20], rdm[21], rdm[22]);
-    //     }
-    // }
 
     return 0;
 }
@@ -115,11 +84,6 @@ int program_handler(artnet_node n, void *d) {
         printf("Program: %s, %s, Subnet: %d, PortAddr: %d\n",
             config.short_name, config.long_name, config.subnet, config.out_ports[0]);
 
-//   ops->short_name = strdup(config.short_name) ;
-//   ops->long_name = strdup(config.long_name) ;
-//   ops->subnet_addr = config.subnet ;
-//   ops->port_addr = config.out_ports[0] ;
-
     return 0 ;
 }
 
@@ -130,9 +94,6 @@ void openrdm_deinit_all() {
 }
 
 int main(int argc, char *argv[]) {
-    uint8_t *tod;
-    int tod_refreshes = 0;
-
     argparse::ArgumentParser program("Artnet OpenRDM Node", "1.0.0");
     program.add_argument("-v", "--verbose")
         .help("Show debugging information")
@@ -218,20 +179,10 @@ int main(int argc, char *argv[]) {
     // set poll reply handler
 //	artnet_set_handler(node, ARTNET_REPLY_HANDLER, reply_handler, NULL)
     if (rdm_enabled) {
-        artnet_set_rdm_initiate_handler(node, rdm_initiate , &tod_refreshes ) ;
-        artnet_set_rdm_handler(node, rdm_handler, NULL ) ;
-
-        tod = generate_rdm_tod(UID_COUNT, tod_refreshes++) ;
-        artnet_add_rdm_devices(node, 0, tod, UID_COUNT) ;
-    
-        artnet_start(node) ;
-
-        artnet_send_tod_control(node, 0x10, ARTNET_TOD_FLUSH) ;
-        artnet_send_rdm(node, 0x00 , tod, UID_COUNT* UID_WIDTH) ;
-        free(tod) ;
-    } else {
-        artnet_start(node) ;
+        artnet_set_rdm_initiate_handler(node, rdm_initiate , NULL ) ;
+        artnet_set_rdm_handler(node, rdm_handler, NULL ) ;;
     }
+    artnet_start(node) ;
     
     // loop until control C
     while(1) {

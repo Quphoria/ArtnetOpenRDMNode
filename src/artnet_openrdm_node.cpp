@@ -95,7 +95,7 @@ void openrdm_deinit_all() {
 
 int main(int argc, char *argv[]) {
     argparse::ArgumentParser program("Artnet OpenRDM Node", "1.0.0");
-    program.add_argument("-v", "--verbose")
+    program.add_argument("-V", "--verbose")
         .help("Show debugging information")
         .default_value(false)
         .implicit_value(true);

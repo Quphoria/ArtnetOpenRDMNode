@@ -293,5 +293,5 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
         }
     }
 
-    return resp_packets; // Return invalid response packet
+    return resp_packets;
 }

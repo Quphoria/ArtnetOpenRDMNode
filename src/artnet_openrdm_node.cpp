@@ -44,40 +44,47 @@ int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
     if (verbose)
         printf("got rdm data for address %d, of length %d\n", address, length);
 
-    if (length >= 25) {
-        if (rdm[0] == RDM_SUB_START_CODE) {
-            printf("rdm %02x%02x%02x%02x%02x%02x cc: 0x%02x, pid: 0x%02x%02x, pdl: 0x%02x\n",
-                rdm[2], rdm[3], rdm[4], rdm[5], rdm[6], rdm[7],
-                rdm[19], rdm[20], rdm[21], rdm[22]);
+    int port;
+    for (port = 0; port < ARTNET_MAX_PORTS; port++)
+        if (artnet_get_universe_addr(n, port, ARTNET_OUTPUT_PORT) == address)
+            break;
+    if (port == ARTNET_MAX_PORTS) return 0;
+
+    if(port == 0) {
+        auto resp = ordm_dev[port].writeRDM(rdm, length);
+        if (resp.first > 0) {
+            artnet_send_rdm(n, address, resp.second.begin(), resp.first);
         }
     }
+
+    // if (length >= 25) {
+    //     if (rdm[0] == RDM_SUB_START_CODE) {
+    //         printf("rdm %02x%02x%02x%02x%02x%02x cc: 0x%02x, pid: 0x%02x%02x, pdl: 0x%02x\n",
+    //             rdm[2], rdm[3], rdm[4], rdm[5], rdm[6], rdm[7],
+    //             rdm[19], rdm[20], rdm[21], rdm[22]);
+    //     }
+    // }
 
     return 0;
 }
 
 int rdm_initiate(artnet_node n, int port, void *d) {
-    uint8_t *tod ;
-    int *count = (int*) d ;
-    uint8_t uid[UID_WIDTH] ;
+
+    if(port == 0) {
+        if (ordm_dev[port].rdm_enabled)
+            std::cout << "Starting Full RDM Discovery on Port: " << port << std::endl;
+        auto tod = ordm_dev[port].fullRDMDiscovery();
+        auto uids = std::vector<uint8_t>();
+        auto num_uids = 0;
+        for (auto &uid : tod) {
+            auto uid_raw = std::array<uint8_t, RDM_UID_LENGTH>();
+            writeUID(uid_raw.data(), uid);
+            uids.insert(uids.end(), uid_raw.begin(), uid_raw.end());
+            num_uids++;
+        }
+        artnet_add_rdm_devices(n, port, uids.data(), num_uids) ;
+    }
     
-    memset(uid, 0x00, UID_WIDTH) ;
-        
-    tod = generate_rdm_tod(UID_COUNT, *count) ;
-    artnet_add_rdm_devices(n, 0, tod, UID_COUNT) ;
-    free(tod) ;
-
-    uid[5] = 0xFF ;
-    uid[4] = *count ;
-    artnet_add_rdm_device(n,0, uid) ;
-
-    uid[5] = 0x03 ;
-    artnet_remove_rdm_device(n,0, uid) ;
-    
-    uid[5] = 0x06 ;
-    artnet_remove_rdm_device(n,0, uid) ;
-
-    (*count)++ ;
-
     return 0;
 }
 
@@ -85,15 +92,12 @@ int rdm_initiate(artnet_node n, int port, void *d) {
  * Called when we have dmx data pending
  */
 int dmx_handler(artnet_node n, int port, void *d) {
-    uint8_t *data ;
-    int len ;
+    uint8_t *data;
+    int len;
 
     if(port == 0) {
         data = artnet_read_dmx(n, port, &len) ;
-        ordm_dev[0].writeDMX(data, len);
-    // pthread_mutex_lock(&mem_mutex) ;
-    // memcpy(&ops->dmx[port][1], data, len) ;
-    // pthread_mutex_unlock(&mem_mutex) ;
+        ordm_dev[port].writeDMX(data, len);
     }
     return 0;
 }

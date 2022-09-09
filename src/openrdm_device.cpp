@@ -47,6 +47,12 @@ void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
     writeDMXOpenRDM(verbose, &ftdi, data, len);
 }
 
+std::pair<int, RDMData> OpenRDMDevice::writeRDM(uint8_t *data, int len) {
+    auto resp = RDMData();
+    size_t resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin());
+    return std::make_pair(resp_len, resp);
+}
+
 UIDList OpenRDMDevice::fullRDMDiscovery() {
     if (discovery_in_progress || !rdm_enabled) return UIDList();
 

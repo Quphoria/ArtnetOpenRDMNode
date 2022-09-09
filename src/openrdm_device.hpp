@@ -19,6 +19,7 @@ class OpenRDMDevice {
         void deinit();
         static void findDevices(bool verbose);
         void writeDMX(uint8_t *data, int len);
+        std::pair<int, RDMData> writeRDM(uint8_t *data, int len);
         UIDList fullRDMDiscovery(); // Returns full TOD
         std::pair<UIDList, UIDList> incrementalRDMDiscovery(); // Returns pair: added devices, removed devices
     protected:

@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
         // Skip 0 length device strings
         if (dev_strings.at(i).size() == 0) continue;
-        for (size_t j = 1; j < ARTNET_MAX_PORTS && j < dev_strings.size(); j++) {
+        for (size_t j = i+1; j < ARTNET_MAX_PORTS && j < dev_strings.size(); j++) {
             if (dev_strings.at(i) != dev_strings.at(j)) continue;
             std::cerr << "Device string argument repeated, please ensure all values for -d/--devices are unique" << std::endl;
             std::exit(1);

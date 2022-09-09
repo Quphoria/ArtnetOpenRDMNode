@@ -69,7 +69,17 @@ void FT_SetBreakOff(struct ftdi_context *ftdi) {
     ftdi_set_line_property2(ftdi, BITS_8, STOP_BIT_2, NONE, BREAK_OFF);
 }
 
-int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char* description) {
+void resetUsbAndInitOpenRDM(int verbose, struct ftdi_context *ftdi) {
+    ftdi_usb_reset(ftdi);
+    ftdi_set_baudrate(ftdi, BAUDRATE);
+    ftdi_set_line_property(ftdi, BITS_8, STOP_BIT_2, NONE);
+    ftdi_setflowctrl(ftdi, SIO_DISABLE_FLOW_CTRL);
+    ftdi_usb_purge_rx_buffer(ftdi);
+    ftdi_usb_purge_tx_buffer(ftdi);
+    FT_SetTimeouts(ftdi, 50, 50);
+}
+
+int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char *description) {
     if (verbose) printf("Initialising OpenRDM Device...\n");
 
     int ret = ftdi_init(ftdi);
@@ -83,13 +93,8 @@ int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char* description)
         fprintf(stderr, "FTDI ERROR %d: %s\n", ret, ftdi->error_str);
         return 0;
     }
-    ftdi_usb_reset(ftdi);
-    ftdi_set_baudrate(ftdi, BAUDRATE);
-    ftdi_set_line_property(ftdi, BITS_8, STOP_BIT_2, NONE);
-    ftdi_setflowctrl(ftdi, SIO_DISABLE_FLOW_CTRL);
-    ftdi_usb_purge_rx_buffer(ftdi);
-    ftdi_usb_purge_tx_buffer(ftdi);
-    FT_SetTimeouts(ftdi, 50, 50);
+    
+    resetUsbAndInitOpenRDM(verbose, ftdi);
 
     if (verbose) printf("Initialised OpenRDM Device: %s\n", description);
     return 1;
@@ -101,7 +106,13 @@ void deinitOpenRDM(int verbose, struct ftdi_context *ftdi) {
     ftdi_deinit(ftdi);
 }
 
-int writeRDMOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, int is_discover, unsigned char *rx_data) {
+void reinitOpenRDM(int verbose, struct ftdi_context *ftdi, const char *description) {
+    if (!ftdi->usb_dev) return;
+    ftdi_usb_close(ftdi);
+    initOpenRDM(verbose, ftdi, description);
+}
+
+int writeRDMOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, int is_discover, unsigned char *rx_data, const char *description) {
     ftdi_usb_purge_rx_buffer(ftdi);
     ftdi_usb_purge_tx_buffer(ftdi);
     FT_SetBreakOn(ftdi);
@@ -112,6 +123,8 @@ int writeRDMOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data,
     int ret = ftdi_write_data(ftdi, data_sc, size+1);
     if (ret < 0) {
         fprintf(stderr, "RDM TX ERROR %d: %s\n", ret, ftdi->error_str);
+        if (ret == -110) // libusb: -110: usb bulk write failed
+            reinitOpenRDM(verbose, ftdi, description);
         return 0;
     }
     if (is_discover) {
@@ -122,7 +135,7 @@ int writeRDMOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data,
     return ftdi_read_data(ftdi, rx_data, 512);
 }
 
-void writeDMXOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size) {
+void writeDMXOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, const char *description) {
     ftdi_usb_purge_rx_buffer(ftdi);
     ftdi_usb_purge_tx_buffer(ftdi);
     FT_SetBreakOn(ftdi);
@@ -133,6 +146,8 @@ void writeDMXOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data
     int ret = ftdi_write_data(ftdi, data_sc, size+1);
     if (ret < 0) {
         fprintf(stderr, "DMX TX ERROR %d: %s\n", ret, ftdi->error_str);
+        if (ret == -110) // libusb: -110: usb bulk write failed
+            reinitOpenRDM(verbose, ftdi, description);
         return;
     }
 }

@@ -46,13 +46,13 @@ void OpenRDMDevice::findDevices(bool verbose) {
 
 void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
     if (!initialized) return;
-    writeDMXOpenRDM(verbose, &ftdi, data, len);
+    writeDMXOpenRDM(verbose, &ftdi, data, len, ftdi_description.c_str());
 }
 
 std::pair<int, RDMData> OpenRDMDevice::writeRDM(uint8_t *data, int len) {
     if (!initialized) return std::make_pair(0, RDMData());
     auto resp = RDMData();
-    size_t resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin());
+    size_t resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin(), ftdi_description.c_str());
     return std::make_pair(resp_len, resp);
 }
 
@@ -174,7 +174,7 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
 
         auto response = RDMData();
         size_t resp_len = writeRDMOpenRDM(verbose, &ftdi,
-            disc_msg_packet.begin(), msg_len, true, response.begin());
+            disc_msg_packet.begin(), msg_len, true, response.begin(), ftdi_description.c_str());
         
         if (resp_len == 0) return UIDList(); // Nothing
         auto resp = DiscoveryResponseRDMPacket(response, resp_len);
@@ -277,7 +277,7 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
 
         auto response = RDMData();
         size_t resp_len = writeRDMOpenRDM(verbose, &ftdi,
-            msg.begin(), msg_len, false, response.begin());
+            msg.begin(), msg_len, false, response.begin(), ftdi_description.c_str());
         if (resp_len == 0) continue;
 
         auto resp = RDMPacket(uid, response, resp_len);

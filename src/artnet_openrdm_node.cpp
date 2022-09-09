@@ -13,7 +13,7 @@
 #include "dmx.h"
 #include "openrdm_device.hpp"
 
-bool verbose = 0 ;
+bool verbose = 0;
 bool rdm_enabled = 0;
 OpenRDMDevice ordm_dev[ARTNET_MAX_PORTS] = {OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice()};
 
@@ -27,11 +27,9 @@ int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
             break;
     if (port == ARTNET_MAX_PORTS) return 0;
 
-    if(port == 0) {
-        auto resp = ordm_dev[port].writeRDM(rdm, length);
-        if (resp.first > 0) {
-            artnet_send_rdm(n, address, resp.second.begin(), resp.first);
-        }
+    auto resp = ordm_dev[port].writeRDM(rdm, length);
+    if (resp.first > 0) {
+        artnet_send_rdm(n, address, resp.second.begin(), resp.first);
     }
 
     return 0;
@@ -39,20 +37,19 @@ int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
 
 int rdm_initiate(artnet_node n, int port, void *d) {
 
-    if(port == 0) {
-        if (ordm_dev[port].rdm_enabled)
-            std::cout << "Starting Full RDM Discovery on Port: " << port << std::endl;
-        auto tod = ordm_dev[port].fullRDMDiscovery();
-        auto uids = std::vector<uint8_t>();
-        auto num_uids = 0;
-        for (auto &uid : tod) {
-            auto uid_raw = std::array<uint8_t, RDM_UID_LENGTH>();
-            writeUID(uid_raw.data(), uid);
-            uids.insert(uids.end(), uid_raw.begin(), uid_raw.end());
-            num_uids++;
-        }
-        artnet_add_rdm_devices(n, port, uids.data(), num_uids) ;
+    if (ordm_dev[port].rdm_enabled)
+        std::cout << "Starting Full RDM Discovery on Port: " << port << std::endl;
+    auto tod = ordm_dev[port].fullRDMDiscovery();
+    if (tod.size() == 0) return 0;
+    auto uids = std::vector<uint8_t>();
+    auto num_uids = 0;
+    for (auto &uid : tod) {
+        auto uid_raw = std::array<uint8_t, RDM_UID_LENGTH>();
+        writeUID(uid_raw.data(), uid);
+        uids.insert(uids.end(), uid_raw.begin(), uid_raw.end());
+        num_uids++;
     }
+    if (num_uids > 0) artnet_add_rdm_devices(n, port, uids.data(), num_uids);
     
     return 0;
 }
@@ -64,10 +61,9 @@ int dmx_handler(artnet_node n, int port, void *d) {
     uint8_t *data;
     int len;
 
-    if(port == 0) {
-        data = artnet_read_dmx(n, port, &len) ;
-        ordm_dev[port].writeDMX(data, len);
-    }
+    data = artnet_read_dmx(n, port, &len);
+    ordm_dev[port].writeDMX(data, len);
+
     return 0;
 }
 
@@ -76,19 +72,19 @@ int dmx_handler(artnet_node n, int port, void *d) {
  * we need to save the configuration to a file
  */
 int program_handler(artnet_node n, void *d) {
-    artnet_node_config_t config ;
+    artnet_node_config_t config;
 
-    artnet_get_config(n, &config) ;
+    artnet_get_config(n, &config);
   
     if (verbose)
         printf("Program: %s, %s, Subnet: %d, PortAddr: %d\n",
             config.short_name, config.long_name, config.subnet, config.out_ports[0]);
 
-    return 0 ;
+    return 0;
 }
 
 void openrdm_deinit_all() {
-    for (int i = 0; i < ARTNET_MAX_PORTS; i++){
+    for (int i = 0; i < ARTNET_MAX_PORTS; i++) {
         ordm_dev[i].deinit();
     }
 }
@@ -111,7 +107,7 @@ int main(int argc, char *argv[]) {
         .nargs(1,ARTNET_MAX_PORTS);
     
     try {
-        program.parse_args(argc, argv);                  // Example: ./main -abc 1.95 2.47
+        program.parse_args(argc, argv);
     } catch (const std::runtime_error& err) {
         std::cerr << err.what() << std::endl;
         std::cerr << program;
@@ -135,11 +131,13 @@ int main(int argc, char *argv[]) {
     bool device_connected = false;
 
     // Initialize openrdm devices
+    size_t num_ports = 0;
     for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
         // Skip 0 length device strings
         if (dev_strings.at(i).size() == 0) continue;
         ordm_dev[i] = OpenRDMDevice(dev_strings.at(i), verbose, rdm_enabled);
         device_connected |= ordm_dev[i].init();
+        num_ports++;
     }
 
     if (!device_connected) {
@@ -166,32 +164,33 @@ int main(int argc, char *argv[]) {
     artnet_set_node_type(node, ARTNET_NODE);
 
     // set the first port to output dmx data
-    artnet_set_port_type(node, 0, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX) ;
-    artnet_set_subnet_addr(node, 0x00) ;
+    for (size_t i = 0; i < num_ports; i++)
+        artnet_set_port_type(node, i, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX);
+    artnet_set_subnet_addr(node, 0x00);
 
     // we want to be notified when the node config changes
-    artnet_set_program_handler(node, program_handler, NULL) ;
-    artnet_set_dmx_handler(node, dmx_handler, NULL) ;
+    artnet_set_program_handler(node, program_handler, NULL);
+    artnet_set_dmx_handler(node, dmx_handler, NULL);
 
     // set the universe address of the first port
-    artnet_set_port_addr(node, 0, ARTNET_OUTPUT_PORT, 0x00) ;
+    for (size_t i = 0; i < num_ports; i++)
+        artnet_set_port_addr(node, i, ARTNET_OUTPUT_PORT, i);
 
     // set poll reply handler
-//	artnet_set_handler(node, ARTNET_REPLY_HANDLER, reply_handler, NULL)
     if (rdm_enabled) {
-        artnet_set_rdm_initiate_handler(node, rdm_initiate , NULL ) ;
-        artnet_set_rdm_handler(node, rdm_handler, NULL ) ;;
+        artnet_set_rdm_initiate_handler(node, rdm_initiate, NULL);
+        artnet_set_rdm_handler(node, rdm_handler, NULL);
     }
-    artnet_start(node) ;
+    artnet_start(node);
     
     // loop until control C
     while(1) {
-        artnet_read(node, 1) ;
+        artnet_read(node, 1);
     }
     // never reached
-    artnet_destroy(node) ;
+    artnet_destroy(node);
 
     openrdm_deinit_all();
 
-    return 0 ;	
+    return 0;	
 }

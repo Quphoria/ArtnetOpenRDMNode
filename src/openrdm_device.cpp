@@ -38,6 +38,8 @@ void OpenRDMDevice::deinit() {
     initialized = false;
 }
 
+bool OpenRDMDevice::isInitialized() { return initialized; }
+
 void OpenRDMDevice::findDevices(bool verbose) {
     findOpenRDMDevices(verbose);
 }

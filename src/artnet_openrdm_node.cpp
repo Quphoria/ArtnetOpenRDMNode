@@ -15,7 +15,7 @@
 
 bool verbose = 0 ;
 bool rdm_enabled = 0;
-OpenRDMDevice ordm_dev[4] = {OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice()};
+OpenRDMDevice ordm_dev[ARTNET_MAX_PORTS] = {OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice()};
 
 int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
     if (verbose)
@@ -88,7 +88,7 @@ int program_handler(artnet_node n, void *d) {
 }
 
 void openrdm_deinit_all() {
-    for (int i = 0; i < 4; i++){
+    for (int i = 0; i < ARTNET_MAX_PORTS; i++){
         ordm_dev[i].deinit();
     }
 }
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         .help("Set the address to listen on");
     program.add_argument("-d", "--devices")
         .help("List of up to 4 OpenRDM FTDI device strings to connect to (empty string to skip node ports), omit this argument to list all OpenRDM devices")
-        .nargs(1,4);
+        .nargs(1,ARTNET_MAX_PORTS);
     
     try {
         program.parse_args(argc, argv);                  // Example: ./main -abc 1.95 2.47
@@ -122,10 +122,10 @@ int main(int argc, char *argv[]) {
     rdm_enabled = program.get<bool>("--rdm");
 
     auto dev_strings = program.get<std::vector<std::string>>("--devices");
-    for (size_t i = 0; i < 4 && i < dev_strings.size(); i++) {
+    for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
         // Skip 0 length device strings
         if (dev_strings.at(i).size() == 0) continue;
-        for (size_t j = 1; j < 4 && j < dev_strings.size(); j++) {
+        for (size_t j = 1; j < ARTNET_MAX_PORTS && j < dev_strings.size(); j++) {
             if (dev_strings.at(i) != dev_strings.at(j)) continue;
             std::cerr << "Device string argument repeated, please ensure all values for -d/--devices are unique" << std::endl;
             std::exit(1);
@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
     bool device_connected = false;
 
     // Initialize openrdm devices
-    for (size_t i = 0; i < 4 && i < dev_strings.size(); i++) {
+    for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
         // Skip 0 length device strings
         if (dev_strings.at(i).size() == 0) continue;
         ordm_dev[i] = OpenRDMDevice(dev_strings.at(i), verbose, rdm_enabled);

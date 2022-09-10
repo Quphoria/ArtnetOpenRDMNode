@@ -23,10 +23,12 @@
 
 #define SEMA_MAX 0xffff
 #define DMX_REFRESH_MS 50
+#define RDM_INCREMENTAL_SCAN_INTERVAL_MS 5*60*1000 // 5 minutes
 
 bool verbose = 0;
 bool rdm_enabled = 0;
 int num_ports = 0;
+bool incremental_scan = false;
 artnet_node node;
 auto ordm_dev = std::array<OpenRDMDevice, ARTNET_MAX_PORTS>();
 
@@ -46,6 +48,7 @@ void device_thread(int port) {
     uint8_t data[DMX_MAX_LENGTH];
     bool dmx_changed = false;
     auto t_last = std::chrono::high_resolution_clock::now();
+    auto i_scan_last = std::chrono::high_resolution_clock::now();
 
     while (!thread_exit[port]) {
         // std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -77,6 +80,8 @@ void device_thread(int port) {
                         artnet_send_rdm(node, msg.address, resp.second.begin(), resp.first);
                     }
                 } else { // 0 length means full RDM Discovery
+                    if (ordm_dev[port].rdm_enabled)
+                        std::cout << "Starting Full RDM Discovery on Port: " << port << std::endl;
                     auto tod = ordm_dev[port].fullRDMDiscovery();
                     if (tod.size() > 0) {
                         auto uids = std::vector<uint8_t>();
@@ -89,6 +94,7 @@ void device_thread(int port) {
                         }
                         if (num_uids > 0) artnet_add_rdm_devices(node, port, uids.data(), num_uids);
                     }
+                    i_scan_last = std::chrono::high_resolution_clock::now();
                 }
             }
             data_mutex[port].unlock();
@@ -105,6 +111,34 @@ void device_thread(int port) {
 
             dev->writeDMX(data, length);
             t_last = std::chrono::high_resolution_clock::now();
+        }
+
+        if (incremental_scan) {
+            elapsed_time_ms = std::chrono::duration<double, std::milli>(t_now-i_scan_last).count();
+            if (elapsed_time_ms > RDM_INCREMENTAL_SCAN_INTERVAL_MS) {
+                if (ordm_dev[port].rdm_enabled)
+                    std::cout << "Starting Incremental RDM Discovery on Port: " << port << std::endl;
+                auto tod_changes = ordm_dev[port].incrementalRDMDiscovery();
+                auto added = tod_changes.first;
+                if (added.size() > 0) {
+                    auto uids = std::vector<uint8_t>();
+                    auto num_uids = 0;
+                    for (auto &uid : added) {
+                        auto uid_raw = std::array<uint8_t, RDM_UID_LENGTH>();
+                        writeUID(uid_raw.data(), uid);
+                        uids.insert(uids.end(), uid_raw.begin(), uid_raw.end());
+                        num_uids++;
+                    }
+                    if (num_uids > 0) artnet_add_rdm_devices(node, port, uids.data(), num_uids);
+                }
+                auto removed = tod_changes.second;
+                for (auto &uid : removed) {
+                    auto uid_raw = std::array<uint8_t, RDM_UID_LENGTH>();
+                    writeUID(uid_raw.data(), uid);
+                    artnet_remove_rdm_device(node, port, uid_raw.data());
+                }
+                i_scan_last = std::chrono::high_resolution_clock::now();
+            }
         }
     }
 
@@ -139,9 +173,6 @@ int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
 
 int rdm_initiate(artnet_node n, int port, void *d) {
     if (port >= num_ports) return 0;
-
-    if (ordm_dev[port].rdm_enabled)
-        std::cout << "Starting Full RDM Discovery on Port: " << port << std::endl;
 
     RDMMessage msg; // Length 0 means full RDM Discovery
     msg.length = 0;
@@ -197,6 +228,10 @@ int main(int argc, char *argv[]) {
         .help("Enable RDM")
         .default_value(false)
         .implicit_value(true);
+    program.add_argument("-i", "--incremental-scan")
+        .help("Enable RDM Incremental Scanning")
+        .default_value(false)
+        .implicit_value(true);
     program.add_argument("-a", "--address")
         .default_value(std::string(""))
         .help("Set the address to listen on");
@@ -214,6 +249,7 @@ int main(int argc, char *argv[]) {
 
     verbose = program.get<bool>("--verbose");
     rdm_enabled = program.get<bool>("--rdm");
+    incremental_scan = program.get<bool>("--incremental-scan");
 
     auto dev_strings = program.get<std::vector<std::string>>("--devices");
     for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {

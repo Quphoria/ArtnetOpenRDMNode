@@ -92,7 +92,10 @@ std::pair<UIDList, UIDList> OpenRDMDevice::incrementalRDMDiscovery() {
     auto found = UIDList();
     auto new_lost = UIDList();
     auto new_proxies = UIDList();
+    bool NA;
+    sendMute(RDM_UID_BROADCAST, true, NA); // Unmute everything
     // Check tod devices are still there and lost devices are still lost
+    // This also mutes devices we know about
     for (auto &uid : tod) {
         bool is_proxy = false;
         if (!sendMute(uid, false, is_proxy)) {

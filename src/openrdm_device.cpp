@@ -46,13 +46,22 @@ void OpenRDMDevice::findDevices(bool verbose) {
 
 void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
     if (!initialized) return;
-    writeDMXOpenRDM(verbose, &ftdi, data, len, ftdi_description.c_str());
+    int ret = writeDMXOpenRDM(verbose, &ftdi, data, len, ftdi_description.c_str());
+    if (ret < 0) { // Error occurred
+        // -666: USB device unavailable, wait a bit to avoid spam
+        if (ret == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }
 
 std::pair<int, RDMData> OpenRDMDevice::writeRDM(uint8_t *data, int len) {
     if (!initialized) return std::make_pair(0, RDMData());
     auto resp = RDMData();
-    size_t resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin(), ftdi_description.c_str());
+    int resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin(), ftdi_description.c_str());
+    if (resp_len < 0) { // Error occurred
+        // -666: USB device unavailable, wait a bit to avoid spam
+        if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
+        return std::make_pair(0, RDMData());
+    }
     return std::make_pair(resp_len, resp);
 }
 
@@ -67,6 +76,10 @@ UIDList OpenRDMDevice::fullRDMDiscovery() {
     bool NA = false;
     sendMute(RDM_UID_BROADCAST, true, NA); // Unmute everything
     tod = discover(0, RDM_UID_MAX);
+
+    if (verbose) {
+        for (auto &uid : tod) printf("RDM Device Discovered: %06lx\n", uid);
+    }
 
     discovery_in_progress = false;
     return tod;
@@ -157,6 +170,11 @@ std::pair<UIDList, UIDList> OpenRDMDevice::incrementalRDMDiscovery() {
         tod.push_back(uid);
     }
 
+    if (verbose) {
+        for (auto &uid : new_lost) printf("RDM Device Lost: %06lx\n", uid);
+        for (auto &uid : found) printf("RDM Device Discovered: %06lx\n", uid);
+    }
+
     discovery_in_progress = false;
     return std::make_pair(found, new_lost);
 }
@@ -173,10 +191,14 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
         size_t msg_len = disc_msg.writePacket(disc_msg_packet);
 
         auto response = RDMData();
-        size_t resp_len = writeRDMOpenRDM(verbose, &ftdi,
+        int resp_len = writeRDMOpenRDM(verbose, &ftdi,
             disc_msg_packet.begin(), msg_len, true, response.begin(), ftdi_description.c_str());
-        
-        if (resp_len == 0) return UIDList(); // Nothing
+        if (resp_len <= 0) { // Error occurred or no data
+            // -666: USB device unavailable, wait a bit to avoid spam
+            if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
+            return UIDList();
+        }
+
         auto resp = DiscoveryResponseRDMPacket(response, resp_len);
         if (!resp.isValid()) {
             uint64_t lower_half_size = (end-start+1) / 2; // Start and end inclusive
@@ -276,8 +298,13 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
         if (pkt_try > 0 && elapsed_time_ms > max_time_ms) break;
 
         auto response = RDMData();
-        size_t resp_len = writeRDMOpenRDM(verbose, &ftdi,
+        int resp_len = writeRDMOpenRDM(verbose, &ftdi,
             msg.begin(), msg_len, false, response.begin(), ftdi_description.c_str());
+        if (resp_len < 0) { // Error occurred
+            // -666: USB device unavailable, wait a bit to avoid spam
+            if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
+            return std::vector<RDMPacket>();
+        }
         if (resp_len == 0) continue;
 
         auto resp = RDMPacket(uid, response, resp_len);

@@ -71,9 +71,24 @@ void device_thread(int port) {
                 auto msg = data_rdm[port].front();
                 data_rdm[port].pop();
 
-                auto resp = ordm_dev[port].writeRDM(msg.data.data(), msg.length);
-                if (resp.first > 0) {
-                    artnet_send_rdm(node, msg.address, resp.second.begin(), resp.first);
+                if (msg.length > 0) {
+                    auto resp = ordm_dev[port].writeRDM(msg.data.data(), msg.length);
+                    if (resp.first > 0) {
+                        artnet_send_rdm(node, msg.address, resp.second.begin(), resp.first);
+                    }
+                } else { // 0 length means full RDM Discovery
+                    auto tod = ordm_dev[port].fullRDMDiscovery();
+                    if (tod.size() > 0) {
+                        auto uids = std::vector<uint8_t>();
+                        auto num_uids = 0;
+                        for (auto &uid : tod) {
+                            auto uid_raw = std::array<uint8_t, RDM_UID_LENGTH>();
+                            writeUID(uid_raw.data(), uid);
+                            uids.insert(uids.end(), uid_raw.begin(), uid_raw.end());
+                            num_uids++;
+                        }
+                        if (num_uids > 0) artnet_add_rdm_devices(node, port, uids.data(), num_uids);
+                    }
                 }
             }
             data_mutex[port].unlock();
@@ -128,17 +143,14 @@ int rdm_initiate(artnet_node n, int port, void *d) {
     if (ordm_dev[port].rdm_enabled)
         std::cout << "Starting Full RDM Discovery on Port: " << port << std::endl;
 
-    auto tod = ordm_dev[port].fullRDMDiscovery();
-    if (tod.size() == 0) return 0;
-    auto uids = std::vector<uint8_t>();
-    auto num_uids = 0;
-    for (auto &uid : tod) {
-        auto uid_raw = std::array<uint8_t, RDM_UID_LENGTH>();
-        writeUID(uid_raw.data(), uid);
-        uids.insert(uids.end(), uid_raw.begin(), uid_raw.end());
-        num_uids++;
-    }
-    if (num_uids > 0) artnet_add_rdm_devices(n, port, uids.data(), num_uids);
+    RDMMessage msg; // Length 0 means full RDM Discovery
+    msg.length = 0;
+
+    data_mutex[port].lock();
+    data_rdm[port].push(msg);
+    data_mutex[port].unlock();
+
+    thread_sema[port]->release();
     
     return 0;
 }

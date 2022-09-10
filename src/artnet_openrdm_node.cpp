@@ -56,6 +56,7 @@ void device_thread(int port) {
             if (dmx_changed) {
                 length = data_dmx[port].length;
                 std::copy_n(data_dmx[port].data.data(), length, data);
+                data_dmx[port].changed = false;
             }
             dmx_mutex[port].unlock();
 

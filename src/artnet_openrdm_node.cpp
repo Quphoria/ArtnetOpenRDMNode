@@ -11,6 +11,7 @@
 #include <array>
 #include <queue>
 #include <chrono>
+#include <memory>
 
 #include <artnet/artnet.h>
 #include <argparse/argparse.hpp>
@@ -20,6 +21,9 @@
 #include "openrdm_device.hpp"
 #include "openrdm_device_thread.hpp"
 
+#define SEMA_MAX 0xffff
+#define DMX_REFRESH_MS 50
+
 bool verbose = 0;
 bool rdm_enabled = 0;
 int num_ports = 0;
@@ -27,7 +31,7 @@ artnet_node node;
 auto ordm_dev = std::array<OpenRDMDevice, ARTNET_MAX_PORTS>();
 
 auto thread_exit = std::array<bool, ARTNET_MAX_PORTS>();
-auto thread_sema = std::array<std::counting_semaphore, ARTNET_MAX_PORTS>();
+auto thread_sema = std::array<std::shared_ptr<std::counting_semaphore<SEMA_MAX>>, ARTNET_MAX_PORTS>();
 auto dmx_mutex = std::array<std::mutex, ARTNET_MAX_PORTS>(); // Use a seperate mutex for dmx so we don't lock the dmx unnecessarily
 auto data_mutex = std::array<std::mutex, ARTNET_MAX_PORTS>();
 auto data_dmx = std::array<DMXMessage, ARTNET_MAX_PORTS>();
@@ -35,17 +39,64 @@ auto data_rdm = std::array<std::queue<RDMMessage>, ARTNET_MAX_PORTS>();
 
 void device_thread(int port) {
     auto *dev = &ordm_dev[port];
+    auto sema = thread_sema[port];
     if (!dev->isInitialized()) return;
     
+    int length;
+    uint8_t data[DMX_MAX_LENGTH];
+    bool dmx_changed = false;
+    auto t_last = std::chrono::high_resolution_clock::now();
+
     while (!thread_exit[port]) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        // std::this_thread::sleep_for(std::chrono::seconds(1));
+        bool sema_acquired = sema->try_acquire_for(std::chrono::milliseconds(DMX_REFRESH_MS));
+        if (sema_acquired) {
+            dmx_mutex[port].lock();
+            dmx_changed = data_dmx[port].changed;
+            if (dmx_changed) {
+                length = data_dmx[port].length;
+                std::copy_n(data_dmx[port].data.data(), length, data);
+            }
+            dmx_mutex[port].unlock();
+
+            if (dmx_changed) {
+                dev->writeDMX(data, length);
+                t_last = std::chrono::high_resolution_clock::now();
+            }
+
+            data_mutex[port].lock();
+            // Handle RDM messages 1 message at a time so we don't halt the dmx too much
+            if (!data_rdm[port].empty()) {
+                auto msg = data_rdm[port].front();
+                data_rdm[port].pop();
+
+                auto resp = ordm_dev[port].writeRDM(msg.data.data(), msg.length);
+                if (resp.first > 0) {
+                    artnet_send_rdm(node, msg.address, resp.second.begin(), resp.first);
+                }
+            }
+            data_mutex[port].unlock();
+        }
+        
+        auto t_now = std::chrono::high_resolution_clock::now();
+        double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_now-t_last).count();
+        if (!sema_acquired || elapsed_time_ms > DMX_REFRESH_MS) {
+            // Timed out, DMX refresh
+            dmx_mutex[port].lock();
+            length = data_dmx[port].length;
+            std::copy_n(data_dmx[port].data.data(), length, data);
+            dmx_mutex[port].unlock();
+
+            dev->writeDMX(data, length);
+            t_last = std::chrono::high_resolution_clock::now();
+        }
     }
 
     dev->deinit();
 }
 
 int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
-    if (length == 0) return;
+    if (length == 0) return 0;
     if (verbose)
         printf("got rdm data for address %d, of length %d\n", address, length);
 
@@ -64,12 +115,7 @@ int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
         data_rdm[port].push(msg);
         data_mutex[port].unlock();
 
-        thread_sema[port].release();
-
-        // auto resp = ordm_dev[port].writeRDM(rdm, length);
-        // if (resp.first > 0) {
-        //     artnet_send_rdm(n, address, resp.second.begin(), resp.first);
-        // }
+        thread_sema[port]->release();
     }
 
     return 0;
@@ -101,14 +147,14 @@ int dmx_handler(artnet_node n, int port, void *d) {
 
     int len;
     uint8_t *data = artnet_read_dmx(n, port, &len);
-    // ordm_dev[port].writeDMX(data, len);
 
     data_mutex[port].lock();
     std::copy_n(data, len, data_dmx[port].data.begin());
+    data_dmx[port].length = len;
     data_dmx[port].changed = true;
     data_mutex[port].unlock();
 
-    thread_sema[port].release();
+    thread_sema[port]->release();
 
     return 0;
 }
@@ -188,6 +234,9 @@ int main(int argc, char *argv[]) {
     if (rdm_enabled && verbose) {
         std::cout << "RDM Enabled" << std::endl;
     }
+
+    for (int i = 0; i < num_ports; i++)
+        thread_sema[i] = std::make_shared<std::counting_semaphore<SEMA_MAX>>(0);
 
     auto ordm_threads = std::vector<std::thread>();
     for (int i = 0; i < num_ports; i++)

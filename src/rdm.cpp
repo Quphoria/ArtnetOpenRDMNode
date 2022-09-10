@@ -1,5 +1,6 @@
 
 #include <functional>
+#include <algorithm>
 
 #include "rdm.hpp"
 #include "dmx.h"
@@ -39,7 +40,7 @@ RDMPacket::RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t mes
     this->pdl = pdl;
     this->pdata = RDMPacketData();
     if (pdl > 0)
-        std::copy(pdata.begin(), pdata.begin() + std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
+        std::copy_n(pdata.begin(), std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
     this->valid = true;
 }
 
@@ -64,7 +65,7 @@ RDMPacket::RDMPacket(UID uid, const RDMData &data, size_t length) { // The first
     this->pid = ((uint16_t)data[20] << 8) | data[21];
     this->pdl = data[22];
     if (this->pdl > 0)
-        std::copy(&data[23], data.begin() + std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
+        std::copy_n(&data[23], std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
     this->valid = true;
 }
 
@@ -84,7 +85,7 @@ size_t RDMPacket::writePacket(RDMData &data) {
     data[21] = pid & 0xff;
     data[22] = pdl;
     if (pdl > 0)
-        std::copy(pdata.begin(), pdata.begin() + std::min(RDM_MAX_PDL, (unsigned int)pdl), &data[23]);
+        std::copy_n(pdata.begin(), std::min(RDM_MAX_PDL, (unsigned int)pdl), &data[23]);
     uint16_t checksum = RDM_START_CODE;
     for (size_t i = 0; i < length-2; i++) {
         checksum += data[i];

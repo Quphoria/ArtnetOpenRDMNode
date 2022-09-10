@@ -1,6 +1,6 @@
 
 AM_CFLAGS = -Wall -Werror
-AM_CXXFLAGS = -Wall -Werror -std=c++17
+AM_CXXFLAGS = -Wall -Werror -std=c++20
 LDADD = $(libartnet_LIBS)
 
 bin_PROGRAMS = artnet_openrdm_node $(NCURSES_PROGS)

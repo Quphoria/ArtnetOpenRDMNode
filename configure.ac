@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.57)
-AC_INIT(artnetopenrdmnode, [1.0.0])
+AC_INIT(Artnet OpenRDM Node, [1.0.0])
 AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_HEADERS(config.h)
@@ -21,9 +21,10 @@ AC_PROG_LIBTOOL
 # FIXME: Replace `main' with a function in `-lncurses':
 AC_CHECK_LIB([ncurses], [initscr], [have_ncurses="yes"])
 AM_CONDITIONAL(HAVE_NCURSES, test "${have_ncurses}" = "yes")
+AC_CHECK_LIB(pthread, pthread_create, [PTHREAD_LIBS+=-lpthread])
 # Check for libftdi
 AC_CHECK_LIB([ftdi],[ftdi_init],[],[echo "error: missing libftdi library, install with: apt-get install libftdi-dev" && exit 1],[])
-LDFLAGS="-lftdi $LDFLAGS"
+LDFLAGS="-lftdi $PTHREAD_LIBS $LDFLAGS"
 
 # Checks for header files.
 AC_HEADER_STDC

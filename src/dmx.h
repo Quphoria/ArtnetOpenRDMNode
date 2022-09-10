@@ -7,7 +7,6 @@
 #define DMX_START_CODE 0
 #define RDM_START_CODE 0xcc
 
-
-
+#define DMX_MAX_LENGTH 512
 
 #endif // __DMX_H__

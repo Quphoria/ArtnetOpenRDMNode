@@ -5,6 +5,12 @@
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <thread>
+#include <mutex>
+#include <semaphore>
+#include <array>
+#include <queue>
+#include <chrono>
 
 #include <artnet/artnet.h>
 #include <argparse/argparse.hpp>
@@ -12,33 +18,69 @@
 #include "rdm.hpp"
 #include "dmx.h"
 #include "openrdm_device.hpp"
+#include "openrdm_device_thread.hpp"
 
 bool verbose = 0;
 bool rdm_enabled = 0;
-OpenRDMDevice ordm_dev[ARTNET_MAX_PORTS] = {OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice(),OpenRDMDevice()};
+int num_ports = 0;
+artnet_node node;
+auto ordm_dev = std::array<OpenRDMDevice, ARTNET_MAX_PORTS>();
+
+auto thread_exit = std::array<bool, ARTNET_MAX_PORTS>();
+auto thread_sema = std::array<std::counting_semaphore, ARTNET_MAX_PORTS>();
+auto dmx_mutex = std::array<std::mutex, ARTNET_MAX_PORTS>(); // Use a seperate mutex for dmx so we don't lock the dmx unnecessarily
+auto data_mutex = std::array<std::mutex, ARTNET_MAX_PORTS>();
+auto data_dmx = std::array<DMXMessage, ARTNET_MAX_PORTS>();
+auto data_rdm = std::array<std::queue<RDMMessage>, ARTNET_MAX_PORTS>();
+
+void device_thread(int port) {
+    auto *dev = &ordm_dev[port];
+    if (!dev->isInitialized()) return;
+    
+    while (!thread_exit[port]) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    dev->deinit();
+}
 
 int rdm_handler(artnet_node n, int address, uint8_t *rdm, int length, void *d) {
+    if (length == 0) return;
     if (verbose)
         printf("got rdm data for address %d, of length %d\n", address, length);
 
-    int port;
-    for (port = 0; port < ARTNET_MAX_PORTS; port++)
-        if (artnet_get_universe_addr(n, port, ARTNET_OUTPUT_PORT) == address)
-            break;
-    if (port == ARTNET_MAX_PORTS) return 0;
+    // Just in case multiple ports have the same address, do it like this
+    for (int port = 0; port < std::min(num_ports, (int)ARTNET_MAX_PORTS); port++) {
+        if (artnet_get_universe_addr(n, port, ARTNET_OUTPUT_PORT) != address) continue;
 
-    auto resp = ordm_dev[port].writeRDM(rdm, length);
-    if (resp.first > 0) {
-        artnet_send_rdm(n, address, resp.second.begin(), resp.first);
+        if (!ordm_dev[port].rdm_enabled) continue;
+
+        RDMMessage msg;
+        msg.address = address;
+        msg.length = length;
+        std::copy_n(rdm, length, msg.data.begin());
+
+        data_mutex[port].lock();
+        data_rdm[port].push(msg);
+        data_mutex[port].unlock();
+
+        thread_sema[port].release();
+
+        // auto resp = ordm_dev[port].writeRDM(rdm, length);
+        // if (resp.first > 0) {
+        //     artnet_send_rdm(n, address, resp.second.begin(), resp.first);
+        // }
     }
 
     return 0;
 }
 
 int rdm_initiate(artnet_node n, int port, void *d) {
+    if (port >= num_ports) return 0;
 
     if (ordm_dev[port].rdm_enabled)
         std::cout << "Starting Full RDM Discovery on Port: " << port << std::endl;
+
     auto tod = ordm_dev[port].fullRDMDiscovery();
     if (tod.size() == 0) return 0;
     auto uids = std::vector<uint8_t>();
@@ -54,15 +96,19 @@ int rdm_initiate(artnet_node n, int port, void *d) {
     return 0;
 }
 
-/*
- * Called when we have dmx data pending
- */
-int dmx_handler(artnet_node n, int port, void *d) {
-    uint8_t *data;
-    int len;
+int dmx_handler(artnet_node n, int port, void *d) { 
+    if (port >= num_ports) return 0;
 
-    data = artnet_read_dmx(n, port, &len);
-    ordm_dev[port].writeDMX(data, len);
+    int len;
+    uint8_t *data = artnet_read_dmx(n, port, &len);
+    // ordm_dev[port].writeDMX(data, len);
+
+    data_mutex[port].lock();
+    std::copy_n(data, len, data_dmx[port].data.begin());
+    data_dmx[port].changed = true;
+    data_mutex[port].unlock();
+
+    thread_sema[port].release();
 
     return 0;
 }
@@ -73,7 +119,6 @@ int dmx_handler(artnet_node n, int port, void *d) {
  */
 int program_handler(artnet_node n, void *d) {
     artnet_node_config_t config;
-
     artnet_get_config(n, &config);
   
     if (verbose)
@@ -83,14 +128,8 @@ int program_handler(artnet_node n, void *d) {
     return 0;
 }
 
-void openrdm_deinit_all() {
-    for (int i = 0; i < ARTNET_MAX_PORTS; i++) {
-        ordm_dev[i].deinit();
-    }
-}
-
 int main(int argc, char *argv[]) {
-    argparse::ArgumentParser program("Artnet OpenRDM Node", "1.0.0");
+    argparse::ArgumentParser program(PACKAGE_NAME, PACKAGE_VERSION);
     program.add_argument("-V", "--verbose")
         .help("Show debugging information")
         .default_value(false)
@@ -131,7 +170,6 @@ int main(int argc, char *argv[]) {
     bool device_connected = false;
 
     // Initialize openrdm devices
-    size_t num_ports = 0;
     for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
         // Skip 0 length device strings
         if (dev_strings.at(i).size() == 0) continue;
@@ -151,20 +189,23 @@ int main(int argc, char *argv[]) {
         std::cout << "RDM Enabled" << std::endl;
     }
 
+    auto ordm_threads = std::vector<std::thread>();
+    for (int i = 0; i < num_ports; i++)
+        ordm_threads.push_back(std::thread(device_thread, i));
     
     char *ip_addr = NULL;
     auto ip_addr_string = program.get<std::string>("--address");
     if (ip_addr_string.size() > 0)
         ip_addr = (char*)ip_addr_string.c_str();
 
-    artnet_node node = artnet_new(ip_addr, verbose);
+    node = artnet_new(ip_addr, verbose);
 
     artnet_set_short_name(node, "OpenRDM-Node");
-    artnet_set_long_name(node, "ArtNet OpenRDM Node");
+    artnet_set_long_name(node, PACKAGE_NAME);
     artnet_set_node_type(node, ARTNET_NODE);
 
     // set the first port to output dmx data
-    for (size_t i = 0; i < num_ports; i++)
+    for (int i = 0; i < num_ports; i++)
         artnet_set_port_type(node, i, ARTNET_ENABLE_OUTPUT, ARTNET_PORT_DMX);
     artnet_set_subnet_addr(node, 0x00);
 
@@ -173,7 +214,7 @@ int main(int argc, char *argv[]) {
     artnet_set_dmx_handler(node, dmx_handler, NULL);
 
     // set the universe address of the first port
-    for (size_t i = 0; i < num_ports; i++)
+    for (int i = 0; i < num_ports; i++)
         artnet_set_port_addr(node, i, ARTNET_OUTPUT_PORT, i);
 
     // set poll reply handler
@@ -190,7 +231,8 @@ int main(int argc, char *argv[]) {
     // never reached
     artnet_destroy(node);
 
-    openrdm_deinit_all();
+    for (size_t i = 0; i < ordm_threads.size(); i++) thread_exit[i] = true;
+    for (auto &ordm_thread : ordm_threads) ordm_thread.join();
 
     return 0;	
 }

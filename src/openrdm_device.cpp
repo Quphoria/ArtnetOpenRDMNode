@@ -334,7 +334,7 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
 
         auto resp = RDMPacket(uid, response, resp_len);
         if (!resp.isValid()) continue;
-        if (resp.cc != pkt.cc) continue; // Check transaction id's match
+        if (resp.transaction_number != pkt.transaction_number) continue; // Check transaction numbers's match
         if (resp.pid != pkt_pid) continue; // Check PID is correct (so we ignore stray queued messages)
 
         if (resp.cc == RDM_CC_DISCOVER_RESP || pkt.cc == RDM_CC_DISCOVER) {

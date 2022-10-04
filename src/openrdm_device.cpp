@@ -10,7 +10,6 @@ OpenRDMDevice::OpenRDMDevice() {
     this->verbose = 0;
     this->rdm_enabled = false;
     this->rdm_debug = false;
-    this->dev_mutex = std::mutex();
 }
 
 OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose, bool rdm_enabled, bool rdm_debug) {
@@ -18,7 +17,6 @@ OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose, bool rd
     this->verbose = verbose;
     this->rdm_enabled = rdm_enabled;
     this->rdm_debug = rdm_debug;
-    this->dev_mutex = std::mutex();
 }
 
 bool OpenRDMDevice::init() {

@@ -9,12 +9,14 @@ OpenRDMDevice::OpenRDMDevice() {
     this->ftdi_description = "";
     this->verbose = 0;
     this->rdm_enabled = false;
+    this->rdm_debug = false;
 }
 
-OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose, bool rdm_enabled) {
+OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose, bool rdm_enabled, bool rdm_debug) {
     this->ftdi_description = ftdi_description;
     this->verbose = verbose;
     this->rdm_enabled = rdm_enabled;
+    this->rdm_debug = rdm_debug;
 }
 
 bool OpenRDMDevice::init() {
@@ -204,6 +206,9 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
 
         auto resp = DiscoveryResponseRDMPacket(response, resp_len);
         if (!resp.isValid()) {
+            if (this->rdm_debug) {
+                printf("Invalid discovery response\n");
+            }
             uint64_t lower_half_size = (end-start+1) / 2; // Start and end inclusive
             UID lower_half_max = start+lower_half_size-1; // Start inclusive
             auto lower_half = discover(start, lower_half_max);
@@ -269,6 +274,10 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
     auto mute_msg = RDMPacket(addr, uid, rdm_transaction_number++, 0x1, 0, 0,
         RDM_CC_DISCOVER, unmute ? RDM_PID_DISC_UNMUTE : RDM_PID_DISC_MUTE,
         0, RDMPacketData());
+    if (this->rdm_debug) {
+        if (unmute) printf("Sending UNMUTE to %06x\n", addr);
+        else printf("Sending MUTE to %06x\n", addr);
+    }
 
     auto resp = sendRDMPacket(mute_msg);
     if (resp.size() == 0) return false;
@@ -277,6 +286,11 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
     if (resp[0].pdl == 0x02 || resp[0].pdl == 0x08) {
         uint16_t control_field = ((uint16_t)resp[0].pdata[0] << 8) | (uint16_t)resp[0].pdata[1];
         is_proxy = (control_field & RDM_CONTROL_MANAGED_PROXY_BITMASK) != 0;
+    }
+
+    if (this->rdm_debug) {
+        if (unmute) printf("UNMUTE Response from %06x\n", addr);
+        else printf("MUTE Response from %06x\n", addr);
     }
 
     return true;

@@ -43,7 +43,7 @@ auto data_rdm = std::array<std::queue<RDMMessage>, ARTNET_MAX_PORTS>();
 
 
 
-void device_thread(int port) {
+void dmx_thread(int port) {
     auto *dev = &ordm_dev[port];
     auto sema = dmx_thread_sema[port];
     if (!dev->isInitialized()) return;

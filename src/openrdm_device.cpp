@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <thread>
 #include <chrono>
+#include <memory>
 
 #include "openrdm_device.hpp"
 
@@ -10,6 +11,7 @@ OpenRDMDevice::OpenRDMDevice() {
     this->verbose = 0;
     this->rdm_enabled = false;
     this->rdm_debug = false;
+    this->dev_mutex = std::make_unique<std::mutex>();
 }
 
 OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose, bool rdm_enabled, bool rdm_debug) {
@@ -17,6 +19,7 @@ OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose, bool rd
     this->verbose = verbose;
     this->rdm_enabled = rdm_enabled;
     this->rdm_debug = rdm_debug;
+    this->dev_mutex = std::make_unique<std::mutex>();
 }
 
 bool OpenRDMDevice::init() {
@@ -48,9 +51,9 @@ void OpenRDMDevice::findDevices(bool verbose) {
 
 void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
     if (!initialized) return;
-    this->dev_mutex.lock();
+    this->dev_mutex->lock();
     int ret = writeDMXOpenRDM(verbose, &ftdi, data, len, ftdi_description.c_str());
-    this->dev_mutex.unlock();
+    this->dev_mutex->unlock();
     if (ret < 0) { // Error occurred
         // -666: USB device unavailable, wait a bit to avoid spam
         if (ret == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -60,9 +63,9 @@ void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
 std::pair<int, RDMData> OpenRDMDevice::writeRDM(uint8_t *data, int len) {
     if (!initialized) return std::make_pair(0, RDMData());
     auto resp = RDMData();
-    this->dev_mutex.lock();
+    this->dev_mutex->lock();
     int resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin(), ftdi_description.c_str());
-    this->dev_mutex.unlock();
+    this->dev_mutex->unlock();
     if (resp_len < 0) { // Error occurred
         // -666: USB device unavailable, wait a bit to avoid spam
         if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -200,10 +203,10 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
         size_t msg_len = disc_msg.writePacket(disc_msg_packet);
 
         auto response = RDMData();
-        this->dev_mutex.lock();
+        this->dev_mutex->lock();
         int resp_len = writeRDMOpenRDM(verbose, &ftdi,
             disc_msg_packet.begin(), msg_len, true, response.begin(), ftdi_description.c_str());
-        this->dev_mutex.unlock();
+        this->dev_mutex->unlock();
         if (resp_len <= 0) { // Error occurred or no data
             // -666: USB device unavailable, wait a bit to avoid spam
             if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -329,10 +332,10 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
         if (pkt_try > 0 && elapsed_time_ms > max_time_ms) break;
 
         auto response = RDMData();
-        this->dev_mutex.lock();
+        this->dev_mutex->lock();
         int resp_len = writeRDMOpenRDM(verbose, &ftdi,
             msg.begin(), msg_len, false, response.begin(), ftdi_description.c_str());
-        this->dev_mutex.unlock();
+        this->dev_mutex->unlock();
         if (resp_len < 0) { // Error occurred
             // -666: USB device unavailable, wait a bit to avoid spam
             if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));

@@ -37,7 +37,7 @@ class OpenRDMDevice {
         UID uid;
         uint8_t rdm_transaction_number = 0;
         UIDList tod, lost, proxies;
-        std::mutex dev_mutex;
+        std::unique_ptr<std::mutex> dev_mutex;
 };
 
 #endif // __OPENRDM_DEVICE_HPP__

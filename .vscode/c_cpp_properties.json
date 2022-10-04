@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${default}",
+                "./"
+            ],
+            "defines": [
+                "HAVE_CONFIG_H"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "cppStandard": "c++20"
+        }
+    ],
+    "version": 4
+}

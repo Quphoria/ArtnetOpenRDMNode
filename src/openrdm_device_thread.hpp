@@ -13,6 +13,7 @@ struct RDMMessage {
 
 struct DMXMessage {
     bool changed;
+    int length;
     std::array<uint8_t, DMX_MAX_LENGTH> data;
 };
 

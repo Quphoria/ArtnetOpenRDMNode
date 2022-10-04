@@ -44,35 +44,37 @@ RDMPacket::RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t mes
     this->valid = true;
 }
 
-RDMPacket::RDMPacket(UID uid, const RDMData &data, size_t length) { // The first byte of data is Sub-Start Code
-    if (length < 25  || length > 25+RDM_MAX_PDL) return; // Invalid packet length
-    if (data[0] != RDM_SUB_START_CODE) return; // Incorrect sub start code
-    if (data[1] != length-2) return; // Incorrect length field
-    if (getUID(&data[2]) != uid) return; // Message isn't for us
-    uint16_t checksum = RDM_START_CODE;
+RDMPacket::RDMPacket(UID uid, const RDMData &data, size_t length) { // The first byte of data is Start Code
+    if (length < 26) return; // Invalid packet length
+    if (data[0] != RDM_START_CODE) return; // Incorrect sub start code
+    if (data[1] != RDM_SUB_START_CODE) return; // Incorrect sub start code
+    if (data[2] > length-2) return; // Incorrect length field
+    length = data[2] + 2; // Trim extra data as if the checksum is ok the message is probably ok
+    if (getUID(&data[3]) != uid) return; // Message isn't for us
+    uint16_t checksum = 0;
     for (size_t i = 0; i < length-2; i++) {
         checksum += data[i];
     }
     if (((checksum >> 8) & 0xff) != data[length-2] ||
         (checksum & 0xff) != data[length-1]) return; // Invalid checksum
-    this->dest = getUID(&data[2]);
-    this->src = getUID(&data[8]);
-    this->transaction_number = data[14];
-    this->port_id_resp_type = data[15];
-    this->message_count = data[16];
-    this->sub_device = ((uint16_t)data[17] << 8) | data[18];
-    this->cc = data[19];
-    this->pid = ((uint16_t)data[20] << 8) | data[21];
-    this->pdl = data[22];
+    this->dest = getUID(&data[4]);
+    this->src = getUID(&data[9]);
+    this->transaction_number = data[15];
+    this->port_id_resp_type = data[16];
+    this->message_count = data[17];
+    this->sub_device = ((uint16_t)data[18] << 8) | data[19];
+    this->cc = data[20];
+    this->pid = ((uint16_t)data[21] << 8) | data[22];
+    this->pdl = data[23];
     if (this->pdl > 0)
-        std::copy_n(&data[23], std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
+        std::copy_n(&data[24], std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
     this->valid = true;
 }
 
 size_t RDMPacket::writePacket(RDMData &data) {
     unsigned int length = 25 + std::min(RDM_MAX_PDL, (unsigned int)pdl);
     data[0] = RDM_SUB_START_CODE;
-    data[1] = length - 2;
+    data[1] = length;
     writeUID(&data[2], dest);
     writeUID(&data[8], src);
     data[14] = transaction_number;
@@ -87,12 +89,13 @@ size_t RDMPacket::writePacket(RDMData &data) {
     if (pdl > 0)
         std::copy_n(pdata.begin(), std::min(RDM_MAX_PDL, (unsigned int)pdl), &data[23]);
     uint16_t checksum = RDM_START_CODE;
-    for (size_t i = 0; i < length-2; i++) {
+    for (size_t i = 0; i < length-1; i++) {
         checksum += data[i];
     }
-    data[length-2] = checksum >> 8;
-    data[length-1] = checksum & 0xff;
-    return length;
+    // We don't have start code so -1
+    data[length-1] = checksum >> 8;
+    data[length] = checksum & 0xff;
+    return length + 1; // Include checksum but subtract start code
 }
 
 bool RDMPacket::isValid() { return valid; }
@@ -100,16 +103,16 @@ uint8_t RDMPacket::getRespType() { return port_id_resp_type; }
 UID RDMPacket::getSrc() { return src; }
 
 DiscoveryResponseRDMPacket::DiscoveryResponseRDMPacket(const RDMData &data, size_t length) {
-    if (length < 17 || length > 24) return;
+    if (length < 17) return;
     size_t i = 0;
     if (data[i] == RDM_START_CODE) i++;
     for (size_t j = 0; j < 7; j++) {
         if (data[i] != 0xFE) break;
         i++;
     }
-    if (length-i != 17) return;
+    if (length-i < 17) return;
     if (data[i] != 0xAA) return;
-    UID uid = 0;
+    uid = 0;
     uid |= (UID)(data[i+1] & data[i+2]) << (5*8);
     uid |= (UID)(data[i+3] & data[i+4]) << (4*8);
     uid |= (UID)(data[i+5] & data[i+6]) << (3*8);

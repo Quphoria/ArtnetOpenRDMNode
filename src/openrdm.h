@@ -19,7 +19,7 @@ int findOpenRDMDevices(int verbose);
 int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char *description);
 void deinitOpenRDM(int verbose, struct ftdi_context *ftdi);
 int writeRDMOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, int is_discover, unsigned char *rx_data, const char *description);
-void writeDMXOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, const char *description);
+int writeDMXOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data, int size, const char *description);
 
 #ifdef __cplusplus
 }

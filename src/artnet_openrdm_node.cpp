@@ -74,8 +74,13 @@ void device_thread(int port) {
                 auto msg = data_rdm[port].front();
                 data_rdm[port].pop();
 
+                auto actual_len = msg.length;
+                if (msg.length > 2) {
+                    actual_len = std::min(actual_len, 1+msg.data[1]);
+                }
+
                 if (msg.length > 0) {
-                    auto resp = ordm_dev[port].writeRDM(msg.data.data(), msg.length);
+                    auto resp = ordm_dev[port].writeRDM(msg.data.data(), actual_len);
                     if (resp.first > 0) {
                         artnet_send_rdm(node, msg.address, resp.second.begin(), resp.first);
                     }

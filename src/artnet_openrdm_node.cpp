@@ -81,8 +81,11 @@ void device_thread(int port) {
 
                 if (msg.length > 0) {
                     auto resp = ordm_dev[port].writeRDM(msg.data.data(), actual_len);
-                    if (resp.first > 0) {
-                        artnet_send_rdm(node, msg.address, resp.second.begin(), resp.first);
+                    if (resp.first > 1) {
+                        if (resp.second[0] == RDM_START_CODE) {
+                            // Trim off START Code (0xCC)
+                            artnet_send_rdm(node, msg.address, resp.second.begin()+1, resp.first-1);
+                        }
                     }
                 } else { // 0 length means full RDM Discovery
                     if (ordm_dev[port].rdm_enabled)

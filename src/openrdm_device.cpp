@@ -204,6 +204,14 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
             return UIDList();
         }
 
+        if (this->rdm_debug) {
+            printf("Discovery Resp:");
+            for (size_t i = 0; i < resp_len, i++) {
+                printf(" %02x", responrdm se[i]);
+            }
+            printf("\n");
+        }
+
         auto resp = DiscoveryResponseRDMPacket(response, resp_len);
         if (!resp.isValid()) {
             if (this->rdm_debug) {
@@ -275,8 +283,8 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
         RDM_CC_DISCOVER, unmute ? RDM_PID_DISC_UNMUTE : RDM_PID_DISC_MUTE,
         0, RDMPacketData());
     if (this->rdm_debug) {
-        if (unmute) printf("Sending UNMUTE to %06x\n", addr);
-        else printf("Sending MUTE to %06x\n", addr);
+        if (unmute) printf("Sending UNMUTE to %06lx\n", addr);
+        else printf("Sending MUTE to %06lx\n", addr);
     }
 
     auto resp = sendRDMPacket(mute_msg);
@@ -289,8 +297,8 @@ bool OpenRDMDevice::sendMute(UID addr, bool unmute, bool &is_proxy) {
     }
 
     if (this->rdm_debug) {
-        if (unmute) printf("UNMUTE Response from %06x\n", addr);
-        else printf("MUTE Response from %06x\n", addr);
+        if (unmute) printf("UNMUTE Response from %06lx\n", addr);
+        else printf("MUTE Response from %06lx\n", addr);
     }
 
     return true;

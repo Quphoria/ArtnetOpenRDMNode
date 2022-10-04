@@ -139,7 +139,7 @@ void rdm_thread(int port) {
         auto t_now = std::chrono::high_resolution_clock::now();
 
         if (incremental_scan) {
-            elapsed_time_ms = std::chrono::duration<double, std::milli>(t_now-i_scan_last).count();
+            auto elapsed_time_ms = std::chrono::duration<double, std::milli>(t_now-i_scan_last).count();
             if (elapsed_time_ms > RDM_INCREMENTAL_SCAN_INTERVAL_MS) {
                 if (ordm_dev[port].rdm_enabled)
                     std::cout << "Starting Incremental RDM Discovery on Port: " << port << std::endl;

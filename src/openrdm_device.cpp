@@ -206,7 +206,7 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
 
         if (this->rdm_debug) {
             printf("Discovery Resp:");
-            for (size_t i = 0; i < resp_len; i++) {
+            for (int i = 0; i < resp_len; i++) {
                 printf(" %02x", response[i]);
             }
             printf("\n");

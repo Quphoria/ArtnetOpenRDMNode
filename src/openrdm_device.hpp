@@ -12,9 +12,9 @@ typedef std::vector<UID> UIDList;
 
 class OpenRDMDevice {
     public:
-        bool verbose, rdm_enabled;
+        bool verbose, rdm_enabled, rdm_debug;
         OpenRDMDevice();
-        OpenRDMDevice(std::string ftdi_description, bool verbose, bool rdm_enabled);
+        OpenRDMDevice(std::string ftdi_description, bool verbose, bool rdm_enabled, bool rdm_debug);
         bool init();
         void deinit();
         bool isInitialized();

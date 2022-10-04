@@ -144,6 +144,10 @@ int main(int argc, char *argv[]) {
     program.add_argument("-d", "--devices")
         .help("List of up to 4 OpenRDM FTDI device strings to connect to (empty string to skip node ports), omit this argument to list all OpenRDM devices")
         .nargs(1,ARTNET_MAX_PORTS);
+    program.add_argument("--rdm-debug")
+        .help("Output debugging information about RDM commands")
+        .default_value(false)
+        .implicit_value(true);
     
     try {
         program.parse_args(argc, argv);
@@ -155,6 +159,7 @@ int main(int argc, char *argv[]) {
 
     verbose = program.get<bool>("--verbose");
     rdm_enabled = program.get<bool>("--rdm");
+    bool rdm_debug = program.get<bool>("--rdm-debug");
 
     auto dev_strings = program.get<std::vector<std::string>>("--devices");
     for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
@@ -173,7 +178,7 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
         // Skip 0 length device strings
         if (dev_strings.at(i).size() == 0) continue;
-        ordm_dev[i] = OpenRDMDevice(dev_strings.at(i), verbose, rdm_enabled);
+        ordm_dev[i] = OpenRDMDevice(dev_strings.at(i), verbose, rdm_enabled, rdm_debug);
         device_connected |= ordm_dev[i].init();
         num_ports++;
     }

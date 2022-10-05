@@ -103,7 +103,8 @@ void rdm_thread(int port) {
                 data_rdm[port].pop();
 
                 auto actual_len = msg.length;
-                if (msg.length > 2) {
+                // Check SUB START CODE (in case new RDM version has different packet structure)
+                if (msg.length > 2 && msg.data[0] == RDM_SUB_START_CODE) {
                     actual_len = std::min(actual_len, 1+msg.data[1]);
                 }
 

@@ -82,17 +82,19 @@ void resetUsbAndInitOpenRDM(int verbose, struct ftdi_context *ftdi) {
 }
 
 int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char *description) {
-    if (verbose) printf("Initialising OpenRDM Device...\n");
+    // if (verbose) printf("Initialising OpenRDM Device...\n");
 
     int ret = ftdi_init(ftdi);
     if (ret != 0) {
         fprintf(stderr, "FTDI ERROR %d: %s\n", ret, ftdi->error_str);
+        if (verbose) printf("Failed to initialise OpenRDM Device: %s\n", description);
         return 0;
     }
 
     ret = ftdi_usb_open_string(ftdi, description);
     if (ret != 0) {
         fprintf(stderr, "FTDI ERROR %d: %s\n", ret, ftdi->error_str);
+        if (verbose) printf("Failed to initialise OpenRDM Device: %s\n", description);
         return 0;
     }
     

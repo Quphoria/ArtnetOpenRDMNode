@@ -313,6 +313,7 @@ int main(int argc, char *argv[]) {
     bool device_connected = false;
 
     // Initialize openrdm devices
+    if (verbose) std::cout << "Initialising OpenRDM Devices..." << std::endl;
     for (size_t i = 0; i < ARTNET_MAX_PORTS && i < dev_strings.size(); i++) {
         // Skip 0 length device strings
         if (dev_strings.at(i).size() == 0) continue;

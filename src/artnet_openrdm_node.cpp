@@ -25,6 +25,7 @@
 #define DMX_REFRESH_MS 50
 #define RDM_SEMA_TIMEOUT_MS 1000
 #define RDM_INCREMENTAL_SCAN_INTERVAL_MS 5*60*1000 // 5 minutes
+static const unsigned int THREAD_REINIT_TIMEOUT_MS = 1000; // 1 second
 
 bool verbose = 0;
 bool rdm_enabled = 0;
@@ -55,6 +56,16 @@ void dmx_thread(int port) {
 
     while (!thread_exit) {
         bool sema_acquired = sema->try_acquire_for(std::chrono::milliseconds(DMX_REFRESH_MS));
+        if (!dev->isInitialized()) {
+            std::cerr << "OPENRDM DMX Thread: Port " << std::to_string(port+1)
+                << " (" << dev->getDescription() << ") not Initialized";
+            if (thread_exit) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_REINIT_TIMEOUT_MS));
+            if (thread_exit) break;
+            dev->init();
+            continue;
+        }
+        
         if (sema_acquired) {
             dmx_mutex[port].lock();
             dmx_changed = data_dmx[port].changed;
@@ -95,6 +106,13 @@ void rdm_thread(int port) {
 
     while (!thread_exit) {
         bool sema_acquired = sema->try_acquire_for(std::chrono::milliseconds(RDM_SEMA_TIMEOUT_MS));
+        if (!dev->isInitialized()) {
+            std::cerr << "OPENRDM RDM Thread: Port " << std::to_string(port+1)
+                << " (" << dev->getDescription() << ") not Initialized";
+            if (thread_exit) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_REINIT_TIMEOUT_MS));
+            continue;
+        }
         if (sema_acquired) {
             data_mutex[port].lock();
             // Handle RDM messages 1 message at a time so we don't halt the dmx too much

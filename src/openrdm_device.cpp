@@ -45,6 +45,8 @@ void OpenRDMDevice::deinit() {
 
 bool OpenRDMDevice::isInitialized() { return initialized; }
 
+std::string OpenRDMDevice::getDescription() { return ftdi_description; }
+
 void OpenRDMDevice::findDevices(bool verbose) {
     findOpenRDMDevices(verbose);
 }
@@ -57,6 +59,8 @@ void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
     if (ret < 0) { // Error occurred
         // -666: USB device unavailable, wait a bit to avoid spam
         if (ret == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
+        //  -19: usb bulk write failed, device disconnected
+        if (ret == -19) deinit();
     }
 }
 

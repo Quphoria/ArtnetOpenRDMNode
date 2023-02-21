@@ -18,6 +18,7 @@ class OpenRDMDevice {
         bool init();
         void deinit();
         bool isInitialized();
+        std::string getDescription();
         static void findDevices(bool verbose);
         void writeDMX(uint8_t *data, int len);
         std::pair<int, RDMData> writeRDM(uint8_t *data, int len);

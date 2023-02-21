@@ -53,18 +53,21 @@ void dmx_thread(int port) {
     uint8_t data[DMX_MAX_LENGTH];
     bool dmx_changed = false;
     auto t_last = std::chrono::high_resolution_clock::now();
+    bool port_ok = true;
 
     while (!thread_exit) {
         bool sema_acquired = sema->try_acquire_for(std::chrono::milliseconds(DMX_REFRESH_MS));
         if (!dev->isInitialized()) {
-            std::cerr << "OPENRDM DMX Thread: Port " << std::to_string(port+1)
-                << " (" << dev->getDescription() << ") not Initialized";
+            if (port_ok) std::cerr << "OPENRDM DMX Thread: Port " << std::to_string(port+1)
+                    << " (" << dev->getDescription() << ") not initialized" << std::endl;
+            port_ok = false;
             if (thread_exit) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_REINIT_TIMEOUT_MS));
             if (thread_exit) break;
             dev->init();
             continue;
         }
+        port_ok = true;
         
         if (sema_acquired) {
             dmx_mutex[port].lock();
@@ -103,16 +106,19 @@ void rdm_thread(int port) {
     if (!dev->isInitialized()) return;
     
     auto i_scan_last = std::chrono::high_resolution_clock::now();
+    bool port_ok = true;
 
     while (!thread_exit) {
         bool sema_acquired = sema->try_acquire_for(std::chrono::milliseconds(RDM_SEMA_TIMEOUT_MS));
         if (!dev->isInitialized()) {
-            std::cerr << "OPENRDM RDM Thread: Port " << std::to_string(port+1)
-                << " (" << dev->getDescription() << ") not Initialized";
+            if (port_ok) std::cerr << "OPENRDM RDM Thread: Port " << std::to_string(port+1)
+                    << " (" << dev->getDescription() << ") not initialized" << std::endl;
+            port_ok = false;
             if (thread_exit) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_REINIT_TIMEOUT_MS));
             continue;
         }
+        port_ok = true;
         if (sema_acquired) {
             data_mutex[port].lock();
             // Handle RDM messages 1 message at a time so we don't halt the dmx too much

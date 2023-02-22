@@ -23,7 +23,10 @@ OpenRDMDevice::OpenRDMDevice(std::string ftdi_description, bool verbose, bool rd
 }
 
 bool OpenRDMDevice::init() {
-    if (initOpenRDM(verbose, &ftdi, ftdi_description.c_str())) {
+    this->dev_mutex->lock();
+    int ret = initOpenRDM(verbose, &ftdi, ftdi_description.c_str());
+    this->dev_mutex->unlock();
+    if (ret) {
         uid = generateUID(ftdi_description);
         discovery_in_progress = false;
         rdm_transaction_number = 0;
@@ -39,7 +42,9 @@ bool OpenRDMDevice::init() {
 
 void OpenRDMDevice::deinit() {
     if (!initialized) return;
+    this->dev_mutex->lock();
     deinitOpenRDM(verbose, &ftdi);
+    this->dev_mutex->unlock();
     initialized = false;
 }
 

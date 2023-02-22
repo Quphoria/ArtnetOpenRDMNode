@@ -57,8 +57,9 @@ void OpenRDMDevice::writeDMX(uint8_t *data, int len) {
     int ret = writeDMXOpenRDM(verbose, &ftdi, data, len, ftdi_description.c_str());
     this->dev_mutex->unlock();
     if (ret < 0) { // Error occurred
-        // -666: USB device unavailable, wait a bit to avoid spam
-        if (ret == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
+        // -666: USB device unavailable, device disconnected
+        if (ret == -666) deinit();
+        // if (ret == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
         //  -19: usb bulk write failed, device disconnected
         if (ret == -19) deinit();
     }

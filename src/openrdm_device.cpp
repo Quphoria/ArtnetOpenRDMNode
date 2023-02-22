@@ -72,8 +72,11 @@ std::pair<int, RDMData> OpenRDMDevice::writeRDM(uint8_t *data, int len) {
     int resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, resp.begin(), ftdi_description.c_str());
     this->dev_mutex->unlock();
     if (resp_len < 0) { // Error occurred
+        // only deinit from writeDMX to prevent random errors resetting module
         // -666: USB device unavailable, wait a bit to avoid spam
         if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
+        //  -19: usb bulk write failed, device disconnected
+        if (resp_len == -19) std::this_thread::sleep_for(std::chrono::seconds(1));
         return std::make_pair(0, RDMData());
     }
     return std::make_pair(resp_len, resp);

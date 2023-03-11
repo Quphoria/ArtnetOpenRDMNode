@@ -3,6 +3,8 @@
 ## How to build libartnet from source
 
 ```sh
+sudo apt-get update
+sudo apt-get install git libtool pkg-config
 git clone https://github.com/Quphoria/libartnet
 cd libartnet
 autoreconf -i
@@ -22,7 +24,18 @@ export LD_LIBRARY_PATH
 
 ## Install libftdi
 
-```
+```sh
 sudo apt-get update
 sudo apt-get install libftdi-dev
+```
+
+## Install ArtnetOpenRDMNode
+
+```sh
+git clone https://github.com/Quphoria/ArtnetOpenRDMNode
+cd ArtnetOpenRDMNode
+autoreconf -i
+./configure
+make
+sudo make install
 ```

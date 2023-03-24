@@ -128,6 +128,7 @@ bool RDMPacket::isValid() { return valid; }
 uint8_t RDMPacket::getRespType() { return port_id_resp_type; }
 UID RDMPacket::getSrc() { return src; }
 UID RDMPacket::getDest() { return dest; }
+UID RDMPacket::hasRx() { return dest != (UID)RDM_UID_BROADCAST; }
 
 DiscoveryResponseRDMPacket::DiscoveryResponseRDMPacket(const RDMData &data, size_t length) {
     if (length < 17) return;

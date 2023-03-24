@@ -52,6 +52,7 @@ class RDMPacket {
         uint8_t getRespType();
         UID getSrc();
         UID getDest();
+        bool hasRx();
         uint8_t transaction_number;
         uint8_t cc;
         uint16_t pid;

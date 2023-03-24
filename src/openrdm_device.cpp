@@ -74,10 +74,7 @@ std::pair<int, RDMData> OpenRDMDevice::writeRDM(uint8_t *data, int len) {
     if (!initialized) return std::make_pair(0, RDMData());
     auto resp = RDMData();
     auto pkt = RDMPacket(data, len);
-    auto rx_expected = true;
-    if (pkt.isValid()) {
-        rx_expected = pkt.getDest() != RDM_UID_BROADCAST;
-    }
+    auto rx_expected = pkt.isValid() ? pkt.hasRx() : true; // If packet is invalid, assume response
     this->dev_mutex->lock();
     int resp_len = writeRDMOpenRDM(verbose, &ftdi, data, len, false, rx_expected, resp.begin(), ftdi_description.c_str());
     this->dev_mutex->unlock();
@@ -223,7 +220,7 @@ UIDList OpenRDMDevice::discover(UID start, UID end) {
         auto response = RDMData();
         this->dev_mutex->lock();
         int resp_len = writeRDMOpenRDM(verbose, &ftdi,
-            disc_msg_packet.begin(), msg_len, true, false, response.begin(), ftdi_description.c_str());
+            disc_msg_packet.begin(), msg_len, true, true, response.begin(), ftdi_description.c_str());
         this->dev_mutex->unlock();
         if (resp_len <= 0) { // Error occurred or no data
             // -666: USB device unavailable, wait a bit to avoid spam
@@ -352,7 +349,7 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
         auto response = RDMData();
         this->dev_mutex->lock();
         int resp_len = writeRDMOpenRDM(verbose, &ftdi,
-            msg.begin(), msg_len, false, pkt.getDest() != RDM_UID_BROADCAST, response.begin(), ftdi_description.c_str());
+            msg.begin(), msg_len, false, pkt.hasRx(), response.begin(), ftdi_description.c_str());
         this->dev_mutex->unlock();
         if (resp_len < 0) { // Error occurred
             // -666: USB device unavailable, wait a bit to avoid spam

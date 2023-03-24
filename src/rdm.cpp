@@ -71,6 +71,32 @@ RDMPacket::RDMPacket(UID uid, const RDMData &data, size_t length) { // The first
     this->valid = true;
 }
 
+RDMPacket::RDMPacket(const uint8_t *data, size_t length) { // The first byte of data is Start Code
+    if (length < 26) return; // Invalid packet length
+    if (data[0] != RDM_START_CODE) return; // Incorrect sub start code
+    if (data[1] != RDM_SUB_START_CODE) return; // Incorrect sub start code
+    if (data[2] > length-2) return; // Incorrect length field
+    length = data[2] + 2; // Trim extra data as if the checksum is ok the message is probably ok
+    uint16_t checksum = 0;
+    for (size_t i = 0; i < length-2; i++) {
+        checksum += data[i];
+    }
+    if (((checksum >> 8) & 0xff) != data[length-2] ||
+        (checksum & 0xff) != data[length-1]) return; // Invalid checksum
+    this->dest = getUID(&data[4]);
+    this->src = getUID(&data[9]);
+    this->transaction_number = data[15];
+    this->port_id_resp_type = data[16];
+    this->message_count = data[17];
+    this->sub_device = ((uint16_t)data[18] << 8) | data[19];
+    this->cc = data[20];
+    this->pid = ((uint16_t)data[21] << 8) | data[22];
+    this->pdl = data[23];
+    if (this->pdl > 0)
+        std::copy_n(&data[24], std::min(RDM_MAX_PDL, (unsigned int)pdl), this->pdata.begin());
+    this->valid = true;
+}
+
 size_t RDMPacket::writePacket(RDMData &data) {
     unsigned int length = 25 + std::min(RDM_MAX_PDL, (unsigned int)pdl);
     data[0] = RDM_SUB_START_CODE;
@@ -101,6 +127,7 @@ size_t RDMPacket::writePacket(RDMData &data) {
 bool RDMPacket::isValid() { return valid; }
 uint8_t RDMPacket::getRespType() { return port_id_resp_type; }
 UID RDMPacket::getSrc() { return src; }
+UID RDMPacket::getDest() { return dest; }
 
 DiscoveryResponseRDMPacket::DiscoveryResponseRDMPacket(const RDMData &data, size_t length) {
     if (length < 17) return;

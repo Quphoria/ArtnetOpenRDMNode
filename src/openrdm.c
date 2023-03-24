@@ -137,7 +137,7 @@ int writeRDMOpenRDM(int verbose, struct ftdi_context *ftdi, unsigned char *data,
     if (is_discover) {
         return ftdi_read_data(ftdi, rx_data, 513);
     }
-    if (!has_rx) return 0;
+    // if (!has_rx) return 0;
     unsigned char i;
     ftdi_read_data(ftdi, &i, 1); // Discard Break
     return ftdi_read_data(ftdi, rx_data, 513);

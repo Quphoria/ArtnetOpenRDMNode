@@ -53,7 +53,7 @@ RDMPacket::RDMPacket(UID uid, const RDMData &data, size_t length) { // The first
     this->dest = getUID(&data[3]);
     if (this->dest != uid &&
         this->dest != (UID)RDM_UID_BROADCAST &&
-        this->dest != (UID)(RDM_RDM_UID_MFR_BROADCAST | (RDM_UID_MFR << 4))) return; // Message isn't for us
+        this->dest != (UID)(RDM_UID_MFR_BROADCAST | (RDM_UID_MFR << 4))) return; // Message isn't for us
     uint16_t checksum = 0;
     for (size_t i = 0; i < length-2; i++) {
         checksum += data[i];
@@ -133,7 +133,7 @@ UID RDMPacket::getSrc() { return src; }
 UID RDMPacket::getDest() { return dest; }
 bool RDMPacket::hasRx() { return dest != (UID)RDM_UID_BROADCAST &&
     // Also catch manufacturer broadcasts
-    (dest & (UID)RDM_RDM_UID_MFR_BROADCAST) != (UID)RDM_RDM_UID_MFR_BROADCAST; }
+    (dest & (UID)RDM_UID_MFR_BROADCAST) != (UID)RDM_UID_MFR_BROADCAST; }
 
 DiscoveryResponseRDMPacket::DiscoveryResponseRDMPacket(const RDMData &data, size_t length) {
     if (length < 17) return;

@@ -31,6 +31,7 @@
 typedef uint64_t UID;
 
 #define RDM_UID_BROADCAST 0xFFFFFFFFFFFF
+#define RDM_UID_MFR_BROADCAST 0x0000FFFFFFFF
 #define RDM_UID_MAX 0xFFFFFFFFFFFE
 #define RDM_UID_LENGTH 6
 #define RDM_UID_MFR 0x7A70 // Open Lighting ETSA Code
@@ -46,10 +47,13 @@ class RDMPacket {
         RDMPacket(UID dest, UID src, uint8_t tn, uint8_t port_id, uint8_t message_count, uint16_t sub_device,
             uint8_t cc, uint16_t pid, uint8_t pdl, const RDMPacketData &pdata);
         RDMPacket(UID uid, const RDMData &data, size_t length);
+        RDMPacket(const uint8_t *data, size_t length);
         size_t writePacket(RDMData &data);
         bool isValid();
         uint8_t getRespType();
         UID getSrc();
+        UID getDest();
+        bool hasRx();
         uint8_t transaction_number;
         uint8_t cc;
         uint16_t pid;

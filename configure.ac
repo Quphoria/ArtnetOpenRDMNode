@@ -17,6 +17,12 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
 
+# Options
+AC_ARG_WITH([gpio],
+    AS_HELP_STRING([--with-gpio],
+        [Enable GPIO Support]),
+    [AC_DEFINE([GPIO_SUPPORT], [1], [GPIO Support])], [])
+
 # Checks for libraries.
 # FIXME: Replace `main' with a function in `-lncurses':
 AC_CHECK_LIB([ncurses], [initscr], [have_ncurses="yes"])

@@ -337,7 +337,10 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
     auto pkt_pid = pkt.pid;
 
     // Don't count first try as a retry
+    bool delay_tx = false;
     for (unsigned int pkt_try = 0; pkt_try <= retries; pkt_try++) {
+        if (delay_tx) std::this_thread::sleep_for(std::chrono::milliseconds(RDM_RETRY_DELAY_MS));
+        delay_tx = true;
         if (pkt_try != 0) {
             pkt.transaction_number = rdm_transaction_number++;
         }
@@ -390,6 +393,7 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
                     pkt.pdl = 1;
                     pkt.pdata[0] = RDM_STATUS_ERROR;
                     std::this_thread::sleep_for(std::chrono::milliseconds(1)*std::min(max_time_ms, retry_time_ms));
+                    delay_tx = false;
                     break;
                 case RDM_RESP_NACK:
                     break;

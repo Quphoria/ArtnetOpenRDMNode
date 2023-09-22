@@ -31,7 +31,7 @@ class OpenRDMDevice {
         UIDList getProxyTOD(UID addr);
         bool hasProxyTODChanged(UID addr);
         bool sendMute(UID addr, bool unmute, bool &is_proxy);
-        std::vector<RDMPacket> sendRDMPacket(RDMPacket pkt, unsigned int retries = 10, double max_time_ms = 2000);
+        std::vector<RDMPacket> sendRDMPacket(RDMPacket pkt, unsigned int retries = 5, double max_time_ms = 2000);
     private:
         bool initialized = false;
         bool discovery_in_progress;

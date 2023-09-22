@@ -74,7 +74,7 @@ RDMPacket::RDMPacket(UID uid, const RDMData &data, size_t length) { // The first
 size_t RDMPacket::writePacket(RDMData &data) {
     unsigned int length = 25 + std::min(RDM_MAX_PDL, (unsigned int)pdl);
     data[0] = RDM_SUB_START_CODE;
-    data[1] = length;
+    data[1] = length-1; // Slot number of checksum high
     writeUID(&data[2], dest);
     writeUID(&data[8], src);
     data[14] = transaction_number;
@@ -89,13 +89,13 @@ size_t RDMPacket::writePacket(RDMData &data) {
     if (pdl > 0)
         std::copy_n(pdata.begin(), std::min(RDM_MAX_PDL, (unsigned int)pdl), &data[23]);
     uint16_t checksum = RDM_START_CODE;
-    for (size_t i = 0; i < length-1; i++) {
+    for (size_t i = 0; i < length-2; i++) {
         checksum += data[i];
     }
     // We don't have start code so -1
-    data[length-1] = checksum >> 8;
-    data[length] = checksum & 0xff;
-    return length + 1; // Include checksum but subtract start code
+    data[length-2] = checksum >> 8;
+    data[length-1] = checksum & 0xff;
+    return length; // Include checksum but subtract start code
 }
 
 bool RDMPacket::isValid() { return valid; }

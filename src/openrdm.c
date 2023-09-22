@@ -78,7 +78,7 @@ void resetUsbAndInitOpenRDM(int verbose, struct ftdi_context *ftdi) {
     ftdi_setflowctrl(ftdi, SIO_DISABLE_FLOW_CTRL);
     ftdi_usb_purge_rx_buffer(ftdi);
     ftdi_usb_purge_tx_buffer(ftdi);
-    FT_SetTimeouts(ftdi, 50, 50);
+    FT_SetTimeouts(ftdi, 20, 50);
 }
 
 int initOpenRDM(int verbose, struct ftdi_context *ftdi, const char *description) {

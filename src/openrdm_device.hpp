@@ -2,7 +2,7 @@
 #ifndef __OPENRDM_DEVICE_HPP__
 #define __OPENRDM_DEVICE_HPP__
 
-#define RDM_RETRY_DELAY_MS 100
+#define RDM_RETRY_DELAY_MS 20
 
 #include <string>
 #include <vector>

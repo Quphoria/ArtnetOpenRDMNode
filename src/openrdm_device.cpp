@@ -359,9 +359,8 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
         
         if (resp_len == 0) {
             // Don't retry for response if its a broadcast message
-            if (pkt.getDest() == RDM_UID_BROADCAST || (pkt.getDest() & RDM_UID_MFR_BROADCAST) == RDM_UID_MFR_BROADCAST) {
-                break;
-            }
+            if (!pkt.hasRx()) break;
+            // Retry for response
             continue;
         }
 

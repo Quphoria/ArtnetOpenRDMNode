@@ -356,7 +356,14 @@ std::vector<RDMPacket> OpenRDMDevice::sendRDMPacket(RDMPacket pkt, unsigned int 
             if (resp_len == -666) std::this_thread::sleep_for(std::chrono::seconds(1));
             return std::vector<RDMPacket>();
         }
-        if (resp_len == 0) continue;
+        
+        if (resp_len == 0) {
+            // Don't retry for response if its a broadcast message
+            if (pkt.getDest() == RDM_UID_BROADCAST || (pkt.getDest() & RDM_UID_MFR_BROADCAST) == RDM_UID_MFR_BROADCAST) {
+                break;
+            }
+            continue;
+        }
 
         auto resp = RDMPacket(uid, response, resp_len);
         if (!resp.isValid()) continue;
